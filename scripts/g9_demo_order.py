@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import sys
 import time
 from decimal import Decimal
 
@@ -9,6 +8,7 @@ from config.settings import config
 from engine.exchange import OKXEngine
 from preflight_layer.domain import AccountState, MarketData, OrderIntent, OrderSide, OrderType
 from preflight_layer.validator import PreFlightValidator
+from adapters.okx_adapter import OKXPreFlightAdapter
 
 
 async def main():
@@ -21,49 +21,60 @@ async def main():
     if not config.API_KEY or not config.API_SECRET or not config.PASSPHRASE:
         raise RuntimeError("G9 requires OKX Demo API credentials")
 
+    # G9 is an isolated, one-shot Demo gate. The normal bot kill switch
+    # remains enabled globally; only this dedicated process may authorize
+    # its single explicitly confirmed Demo order.
+    if config.KILL_SWITCH_ACTIVE:
+        config.KILL_SWITCH_ACTIVE = False
+
     engine = OKXEngine()
     try:
         await engine.initialize()
-        metadata = await __import__("adapters.okx_adapter", fromlist=["OKXPreFlightAdapter"]).OKXPreFlightAdapter(engine).fetch_instrument_metadata(config.SYMBOL)
-        balance = await engine.fetch_balance()
-        price = await engine.fetch_current_price(config.SYMBOL)
-        if not price or price <= 0:
+        adapter = OKXPreFlightAdapter(engine)
+        metadata = await adapter.fetch_instrument_metadata(config.SYMBOL)
+        account = await adapter.fetch_account_state()
+        market = await adapter.fetch_market_data(config.SYMBOL)
+
+        if market.last <= 0:
             raise RuntimeError("G9 market price unavailable")
 
-        # One deliberately tiny, one-shot limit order just below market.
-        raw_price = Decimal(str(price))
+        # One deliberately tiny, one-shot BUY LIMIT order below market.
+        raw_price = market.last
         tick = metadata.tick_size
         order_price = (raw_price / tick).to_integral_value() * tick - tick
+        if order_price <= 0:
+            raise RuntimeError("G9 calculated an invalid order price")
+
         size = max(metadata.min_size, metadata.lot_size)
-        account = AccountState(
-            balance=Decimal(str(balance)),
-            available_margin=Decimal(str(balance)),
-            leverage=Decimal(str(config.LEVERAGE)),
-        )
-        market = MarketData(
-            bid=raw_price, ask=raw_price, last=raw_price, timestamp=time.time()
-        )
         intent = OrderIntent(
             instrument_id=metadata.symbol,
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
             price=order_price,
             size=size,
-            leverage=Decimal(str(config.LEVERAGE)),
+            leverage=account.leverage,
             margin_mode=config.MARGIN_MODE,
             position_side="net",
             reduce_only=False,
             client_order_id="g9-demo-once",
         )
+
         validator = PreFlightValidator()
         result = validator.validate(intent, metadata, account, market)
         if not result.passed or validator.state.value != "AUTHORIZED":
-            raise RuntimeError(f"G9 preflight rejected: {result.rejection_code} {result.message}")
+            raise RuntimeError(
+                f"G9 preflight rejected: {result.rejection_code} {result.message}"
+            )
 
         order = await engine.place_order(
-            config.SYMBOL, "buy", float(size), float(order_price), "limit",
+            config.SYMBOL,
+            "buy",
+            float(size),
+            float(order_price),
+            "limit",
             params={"tdMode": config.MARGIN_MODE, "clOrdId": "g9-demo-once"},
         )
+
         evidence = {
             "gate": "G9",
             "mode": "DEMO",
