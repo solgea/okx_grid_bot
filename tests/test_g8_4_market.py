@@ -19,7 +19,8 @@ def intent(price="60000", size="0.01", leverage="3"):
 def metadata():
     return InstrumentMetadata(symbol="BTC/USDT:USDT", min_size=Decimal("0.01"), tick_size=Decimal("0.1"), lot_size=Decimal("0.01"), contract_val=Decimal("0.01"), is_live=True)
 
-def test_g8_4_rejects_nonpositive_last():
+def test_g8_4_rejects_nonpositive_last(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(
         intent(), metadata(), account(),
         MarketData(bid=Decimal("60000"), ask=Decimal("60000"), last=Decimal("0"), timestamp=time.time()),
@@ -27,7 +28,8 @@ def test_g8_4_rejects_nonpositive_last():
     assert not result.passed
     assert result.rejection_code == "PF026_MARKET_DATA_UNAVAILABLE"
 
-def test_g8_4_rejects_stale_timestamp():
+def test_g8_4_rejects_stale_timestamp(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(
         intent(), metadata(), account(),
         MarketData(bid=Decimal("60000"), ask=Decimal("60000"), last=Decimal("60000"), timestamp=time.time()-120),
