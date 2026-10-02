@@ -298,14 +298,19 @@ async def main():
                     logger.error(f"🔁 Yeniden bağlanma başarısız: {reconnect_error}")
                 await asyncio.sleep(sleep_time)
 
-            except Exception as loop_err:
-                logger.error(f"🚨 Kritik İç Sistem Hatası: {loop_err}")
+            except ExchangeError as exchange_err:
+                retry_count += 1
+                logger.error("OKX exchange error: %s", exchange_err)
                 if not engine.connected:
                     try:
                         await engine.reconnect()
                     except Exception as reconnect_error:
-                        logger.error(f"🔁 Yeniden bağlanma başarısız: {reconnect_error}")
-                await asyncio.sleep(5)
+                        logger.error("Exchange reconnect failed: %s", reconnect_error)
+                await asyncio.sleep(min(max_delay, base_delay * (backoff_factor ** retry_count)))
+
+            except Exception as loop_err:
+                logger.critical("Fatal internal execution error; halting: %s", loop_err, exc_info=True)
+                break
 
     finally:
         stop_event.set()
