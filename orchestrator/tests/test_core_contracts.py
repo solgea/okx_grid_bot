@@ -2,7 +2,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from orchestrator.core.policy import PolicyDecision
+from orchestrator.core.policy import DefaultPolicyEngine, PolicyDecision
 from orchestrator.core.state import TaskState
 from orchestrator.core.task import TaskEnvelope
 
@@ -34,6 +34,10 @@ def test_task_states_include_full_lifecycle_and_terminals():
     assert TaskState.REPORTED.value == "REPORTED"
     assert TaskState.BLOCKED.value == "BLOCKED"
 
+
+def test_default_policy_denies_restricted_actions_even_if_requested():
+    decision=DefaultPolicyEngine().evaluate(make_task(), "live_order")
+    assert decision.allowed is False
 
 def test_policy_decision_is_explicit():
     decision = PolicyDecision(allowed=False, action="live_exchange", reason="restricted action")
