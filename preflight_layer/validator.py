@@ -6,7 +6,7 @@ from config.settings import config
 from preflight_layer.domain import (
     OrderIntent, InstrumentMetadata, AccountState, MarketData,
     PreFlightState, ValidationResult, ValidationCheck,
-    PF001_INVALID_INSTRUMENT, PF002_INSTRUMENT_NOT_LIVE, PF004_INVALID_TICK_SIZE, PF005_INVALID_LOT_SIZE,
+    PF001_INVALID_INSTRUMENT, PF002_INSTRUMENT_NOT_LIVE, PF004_INVALID_TICK_SIZE, PF005_INVALID_LOT_SIZE, PF013_INVALID_CONTRACT_VALUE,
     PF006_INVALID_MIN_SIZE, PF007_INVALID_PRICE, PF008_PRICE_TICK_MISMATCH,
     PF009_INVALID_QUANTITY, PF010_QUANTITY_BELOW_MIN, PF011_QUANTITY_LOT_MISMATCH,
     PF015_INVALID_LEVERAGE, PF016_LEVERAGE_EXCEEDED, PF017_INSUFFICIENT_MARGIN,
@@ -64,6 +64,9 @@ class PreFlightValidator:
             return result
         if metadata.min_size <= 0:
             self.state = self._reject(result, PF006_INVALID_MIN_SIZE, "Invalid exchange minimum size.")
+            return result
+        if metadata.contract_val <= 0:
+            self.state = self._reject(result, PF013_INVALID_CONTRACT_VALUE, "Invalid exchange contract value.")
             return result
         if intent.price is None or intent.price <= 0:
             self.state = self._reject(result, PF007_INVALID_PRICE, "Order price must be positive.")
