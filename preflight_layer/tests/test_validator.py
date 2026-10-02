@@ -317,3 +317,21 @@ async def test_okx_preflight_adapter_fetch_account_state_uses_configured_leverag
     assert account.balance == Decimal("1000.0")
     assert account.available_margin == Decimal("750.0")
     assert account.leverage == Decimal("10")
+
+
+@pytest.mark.asyncio
+async def test_okx_preflight_adapter_maps_missing_last_price_to_unavailable_market_data():
+    from adapters.okx_adapter import OKXPreFlightAdapter
+
+    class FakeExchange:
+        async def fetch_ticker(self, instrument_id):
+            return {"bid": None, "ask": None, "last": None, "timestamp": None}
+
+    class FakeEngine:
+        exchange = FakeExchange()
+
+    market = await OKXPreFlightAdapter(FakeEngine()).fetch_market_data("BTC/USDT:USDT")
+
+    assert market.last == Decimal("0")
+    assert market.bid == Decimal("0")
+    assert market.ask == Decimal("0")
