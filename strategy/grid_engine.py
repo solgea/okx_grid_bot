@@ -107,7 +107,7 @@ class GridEngine:
             self.confluence_score = max(0, min(100, int(confluence_score)))
         if current_price <= 0 or self.lower_price >= self.upper_price or not self.grid_levels:
             self._transition(GridState.PAUSED, "Geçersiz fiyat veya grid aralığı")
-        elif self.confluence_score < 50:
+        elif confluence_score is not None and self.confluence_score < 50:
             self._transition(GridState.RISK_OFF, "Kurumsal confluence skoru düşük")
         elif current_position_size == 0:
             self._transition(GridState.READY, "Açık pozisyon yok")
@@ -235,6 +235,7 @@ class GridEngine:
         self.update_state(current_price, current_position_size, entry_price, confluence_score)
         if self.state == GridState.RISK_OFF:
             return []
+        
         intents = []
         
         pos_dec = Decimal(str(current_position_size))
@@ -269,13 +270,8 @@ class GridEngine:
                         alloc = min(abs(pos_dec), contract_dec)
                         amount_dec = alloc
                         pos_dec += alloc
-                    else:
-                        amount_dec = Decimal('0')
-            
             if amount_dec > 0:
-                # Lot limitine (ROUND_DOWN garantisi) Decimal seviyesinde yuvarlama
                 final_amount = amount_dec.quantize(Decimal('0.00000001'), rounding=ROUND_DOWN).normalize()
-                
                 intent = OrderIntent(
                     instrument_id=instrument_id,
                     side=OrderSide.BUY if side_str == "buy" else OrderSide.SELL,
@@ -284,26 +280,17 @@ class GridEngine:
                     size=final_amount,
                     leverage=Decimal(str(config.LEVERAGE)),
                     margin_mode=config.MARGIN_MODE,
-                    position_side="net",        
+                    position_side="net",
                     reduce_only=is_take_profit,
                     client_order_id=f"grid_{uuid.uuid4().hex[:6]}"
                 )
-                
-                # --- YENİ: FRICTION FILTER (Risk Adapter) İÇİN HEDEF FİYAT ENJEKSİYONU ---
                 if is_take_profit:
-                    # Kapatma emri (TP) ise, kârımızı bu seviye (lvl) ile asıl giriş fiyatı (entry) arasında hesaplarız.
                     intent.expected_target_price = float(entry_dec)
                 else:
-                    # Yeni giriş emri (Add) ise, hedef kârımız grid'in bir sonraki seviyesi kadardır.
                     if side_str == "buy":
                         intent.expected_target_price = lvl + self.grid_step
                     else:
                         intent.expected_target_price = lvl - self.grid_step
-                        
-                # Limit emirleri tahtaya yazıldığı için maker kabul edilir
-                intent.is_maker = True 
-                # -------------------------------------------------------------------------
-
+                intent.is_maker = True
                 intents.append(intent)
-                
         return intents

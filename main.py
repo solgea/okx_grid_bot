@@ -8,7 +8,6 @@ import time
 import signal
 from collections import deque
 from decimal import Decimal
-from typing import cast
 from datetime import datetime
 
 # CCXT Hata Sınıfları (Backoff Mekanizması İçin)
@@ -28,8 +27,7 @@ from engine.exchange import OKXEngine
 from strategy.grid_engine import GridEngine
 from strategy.smc_engine import SMCVolumeEngine
 from preflight_layer.domain import AccountState, MarketData
-from risk.risk_manager import RiskManager
-from engine.risk_manager import RiskManager as EngineRiskManager
+from engine.risk_manager import RiskManager
 from engine.sync_engine import OrderSyncEngine
 from adapters.market_stream import MarketEvent
 from preflight_layer.cache import load_state, save_state
@@ -67,7 +65,7 @@ async def main():
 
     # 2. PreFlight (Uçuş Öncesi) Adaptörlerinin Kurulumu
     exchange_adapter = OKXPreFlightAdapter(engine)
-    risk_adapter = RiskPreFlightAdapter(cast(EngineRiskManager, risk))
+    risk_adapter = RiskPreFlightAdapter(risk)
     
     # 3. Validator ve Order Manager'ın Bağlanması
     validator = PreFlightValidator(risk_manager=risk_adapter)
@@ -300,14 +298,19 @@ async def main():
                     logger.error(f"🔁 Yeniden bağlanma başarısız: {reconnect_error}")
                 await asyncio.sleep(sleep_time)
 
-            except Exception as loop_err:
-                logger.error(f"🚨 Kritik İç Sistem Hatası: {loop_err}")
+            except ExchangeError as exchange_err:
+                retry_count += 1
+                logger.error("OKX exchange error: %s", exchange_err)
                 if not engine.connected:
                     try:
                         await engine.reconnect()
                     except Exception as reconnect_error:
-                        logger.error(f"🔁 Yeniden bağlanma başarısız: {reconnect_error}")
-                await asyncio.sleep(5)
+                        logger.error("Exchange reconnect failed: %s", reconnect_error)
+                await asyncio.sleep(min(max_delay, base_delay * (backoff_factor ** retry_count)))
+
+            except Exception as loop_err:
+                logger.critical("Fatal internal execution error; halting: %s", loop_err, exc_info=True)
+                break
 
     finally:
         stop_event.set()

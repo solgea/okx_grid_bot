@@ -123,7 +123,7 @@ def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
     
     result = validator.validate(valid_intent, valid_metadata, account, market)
     assert result.passed == False
-    assert result.rejection_code == "MIN_SIZE_VIOLATION"
+    assert result.rejection_code == "PF010_QUANTITY_BELOW_MIN"
 
 
 def test_risk_manager_rejection_is_not_bypassed(valid_intent, valid_metadata):
@@ -159,10 +159,11 @@ async def test_order_manager_uses_latest_async_websocket_market_snapshot(
         available_margin=Decimal("1000"),
         leverage=Decimal("10"),
     )
+    current_time_ms = int(time.time() * 1000)
     adapter = AsyncWebSocketAdapter(
         snapshots=[
-            {"bidPx": "10.3", "askPx": "10.5", "last": "10.4", "ts": 1_700_000_000_000},
-            {"bidPx": "10.4", "askPx": "10.6", "last": "10.5", "ts": 1_700_000_001_000},
+            {"bidPx": "10.3", "askPx": "10.5", "last": "10.4", "ts": current_time_ms - 1000},
+            {"bidPx": "10.4", "askPx": "10.6", "last": "10.5", "ts": current_time_ms},
         ],
         account=account,
         metadata=valid_metadata,
@@ -175,7 +176,7 @@ async def test_order_manager_uses_latest_async_websocket_market_snapshot(
         "bidPx": "10.4",
         "askPx": "10.6",
         "last": "10.5",
-        "ts": 1_700_000_001_000,
+        "ts": current_time_ms,
     }
     assert validator.state == PreFlightState.AUTHORIZED
 
