@@ -67,6 +67,10 @@ class PreFlightValidator:
         if intent.size < metadata.min_size:
             self.state = self._reject(result, PF010_QUANTITY_BELOW_MIN, f"Order size {intent.size} is below minimum {metadata.min_size}.")
             return result
+        max_size = Decimal(str(config.MAX_POSITION_SIZE))
+        if intent.size > max_size:
+            self.state = self._reject(result, PF018_MAX_SIZE_EXCEEDED, f"Order size {intent.size} exceeds maximum {max_size}.")
+            return result
         if not _aligned(intent.price, metadata.tick_size):
             self.state = self._reject(result, PF008_PRICE_TICK_MISMATCH, f"Price {intent.price} is not aligned to tick size {metadata.tick_size}.")
             return result
