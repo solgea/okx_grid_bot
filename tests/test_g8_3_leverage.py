@@ -19,12 +19,14 @@ def intent(price="60000", size="0.01", leverage="3"):
 def metadata():
     return InstrumentMetadata(symbol="BTC/USDT:USDT", min_size=Decimal("0.01"), tick_size=Decimal("0.1"), lot_size=Decimal("0.01"), contract_val=Decimal("0.01"), is_live=True)
 
-def test_g8_3_rejects_leverage_above_account_limit():
+def test_g8_3_rejects_leverage_above_account_limit(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(intent(leverage="5"), metadata(), account(), market())
     assert not result.passed
     assert result.rejection_code == "PF016_LEVERAGE_EXCEEDED"
 
-def test_g8_3_rejects_insufficient_margin():
+def test_g8_3_rejects_insufficient_margin(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(
         intent(size="0.01", leverage="1"),
         metadata(),
