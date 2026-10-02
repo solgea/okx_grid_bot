@@ -127,7 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$GROQ_API_KEY" || { echo "GROQ_API_KEY is required."; exit 1; }
-          aider             --model groq/llama-3.3-70b-versatile             --no-auto-commits             --no-dirty-commits             --no-auto-lint             --no-auto-test             --no-stream             --yes-always             --message-file agent/runtime/AGENT_PROMPT.md
+          aider             --model groq/openai/gpt-oss-120b             --no-auto-commits             --no-dirty-commits             --no-auto-lint             --no-auto-test             --no-stream             --yes-always             --message-file agent/runtime/AGENT_PROMPT.md
 
       - name: Validate agent result
         id: validate
