@@ -25,7 +25,8 @@ class MasterOrchestrator:
             return self.store.transition(task_id,TaskState.VERIFYING,result.evidence)
         if s == TaskState.VERIFYING:
             result=self.dispatcher.dispatch(record.task,AgentRequest(task_id,"test","run_tests",{}))
-            if result.status != "success": return self.store.transition(task_id,TaskState.DIAGNOSING,result.evidence)
+            if result.status != "success" or not result.evidence.get("verification", {}).get("passed"):
+                return self.store.transition(task_id,TaskState.DIAGNOSING,result.evidence)
             return self.store.transition(task_id,TaskState.REVIEWING,result.evidence)
         if s == TaskState.REVIEWING:
             result=self.dispatcher.dispatch(record.task,AgentRequest(task_id,"reviewer","review",{}))
