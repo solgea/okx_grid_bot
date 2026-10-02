@@ -10,7 +10,7 @@ from preflight_layer.domain import (
     PF006_INVALID_MIN_SIZE, PF007_INVALID_PRICE, PF008_PRICE_TICK_MISMATCH,
     PF009_INVALID_QUANTITY, PF010_QUANTITY_BELOW_MIN, PF011_QUANTITY_LOT_MISMATCH,
     PF015_INVALID_LEVERAGE, PF016_LEVERAGE_EXCEEDED, PF017_INSUFFICIENT_MARGIN,
-    PF018_MAX_SIZE_EXCEEDED, PF025_STALE_MARKET_DATA, PF026_MARKET_DATA_UNAVAILABLE, PF027_ACCOUNT_CONFIGURATION_INVALID, PF029_KILL_SWITCH,
+    PF018_MAX_SIZE_EXCEEDED, PF025_STALE_MARKET_DATA, PF026_MARKET_DATA_UNAVAILABLE, PF027_ACCOUNT_CONFIGURATION_INVALID, PF029_KILL_SWITCH, PF030_TRADING_HALTED,
 )
 
 
@@ -45,6 +45,10 @@ class PreFlightValidator:
 
         if config.KILL_SWITCH_ACTIVE:
             self.state = self._reject(result, PF029_KILL_SWITCH, "Trading blocked by active kill switch.")
+            return result
+
+        if self.risk_manager and getattr(self.risk_manager, "is_trading_halted", lambda: False)():
+            self.state = self._reject(result, PF030_TRADING_HALTED, "Trading is halted.")
             return result
 
         if metadata is None:
