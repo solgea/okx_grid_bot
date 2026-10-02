@@ -55,7 +55,8 @@ def test_preflight_accepts_aligned_order(monkeypatch):
     assert result.passed
 
 
-def test_preflight_rejects_tick_mismatch():
+def test_preflight_rejects_tick_mismatch(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(intent(price="60000.05"), metadata(), account(), market())
     assert not result.passed
     assert result.rejection_code == "PF008_PRICE_TICK_MISMATCH"
