@@ -1,0 +1,95 @@
+name: Master Orchestrator Runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_json:
+        description: "Validated orchestrator task envelope as JSON"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  orchestrator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONUNBUFFERED: "1"
+      ORCHESTRATOR_ROOT: ".orchestrator"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Materialize task envelope
+        env:
+          TASK_JSON: ${{ inputs.task_json }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(os.environ["TASK_JSON"])
+          required = {
+              "task_id",
+              "type",
+              "priority",
+              "scope",
+              "allowed_actions",
+              "forbidden_actions",
+              "success_condition",
+          }
+          missing = sorted(required - payload.keys())
+          if missing:
+              raise SystemExit(f"invalid task envelope; missing: {missing}")
+
+          Path("task.json").write_text(
+              json.dumps(payload, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Submit task to Master Orchestrator
+        run: |
+          python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" submit task.json
+
+      - name: Execute task through Master Orchestrator
+        run: |
+          TASK_ID="$(python - <<'PY'
+          import json
+          print(json.load(open("task.json", encoding="utf-8"))["task_id"])
+          PY
+          )"
+          python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" run "$TASK_ID"
+
+      - name: Capture lifecycle status
+        if: always()
+        run: |
+          TASK_ID="$(python - <<'PY'
+          import json
+          print(json.load(open("task.json", encoding="utf-8"))["task_id"])
+          PY
+          )"
+          python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" status "$TASK_ID" || true
+          python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" report "$TASK_ID" || true
+
+      - name: Upload orchestrator audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orchestrator-${{ github.run_id }}
+          path: |
+            .orchestrator/
+            task.json
+          if-no-files-found: error
