@@ -20,6 +20,7 @@ def task(): return TaskEnvelope("t1","engineering_fix","blocking","single_failur
 
 def test_successful_bounded_lifecycle():
     o=make(); r=o.submit(task()); final=o.run(r.task.task_id); assert final.state.value=="REPORTED"
+    assert any(e.get("verification",{}).get("passed") for e in final.evidence)
 
 def test_policy_denial_blocks():
     o=make("modify_code"); r=o.submit(task()); final=o.run(r.task.task_id); assert final.state.value=="BLOCKED"
