@@ -53,6 +53,10 @@ class MockRiskManager(IRiskManager):
     def validate_risk(self, account, intent) -> bool: return True  
 
 
+class HaltedRiskManager(MockRiskManager):
+    def is_trading_halted(self) -> bool: return True
+
+
 class RejectingRiskManager(MockRiskManager):
     def validate_risk(self, account, intent) -> bool: return False
 
@@ -150,6 +154,30 @@ def test_max_position_size_rejected(monkeypatch, valid_intent, valid_metadata):
     assert result.passed is False
     assert result.rejection_code == "PF018_MAX_SIZE_EXCEEDED"
     assert result.message == "Order size 0.11 exceeds maximum 0.1."
+
+
+
+
+def test_trading_halted_rejected_with_pf030(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+    validator = PreFlightValidator(risk_manager=HaltedRiskManager())
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("10"),
+    )
+    market = MarketData(
+        bid=Decimal("10.4"),
+        ask=Decimal("10.6"),
+        last=Decimal("10.5"),
+        timestamp=time.time(),
+    )
+
+    result = validator.validate(valid_intent, valid_metadata, account, market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF030_TRADING_HALTED"
+    assert validator.state == PreFlightState.REJECTED
 
 
 def test_risk_manager_rejection_is_not_bypassed(monkeypatch, valid_intent, valid_metadata):
