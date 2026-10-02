@@ -129,7 +129,8 @@ def test_quantity_below_min_rejected(monkeypatch, validator, valid_intent, valid
     assert result.rejection_code == "PF010_QUANTITY_BELOW_MIN"
 
 
-def test_max_position_size_rejected(valid_intent, valid_metadata):
+def test_max_position_size_rejected(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     valid_intent.size = Decimal("0.11")
 
     account = AccountState(
