@@ -262,3 +262,5 @@ def test_account_leverage_must_be_positive(monkeypatch, valid_intent, valid_meta
     assert result.rejection_code == "PF027_ACCOUNT_CONFIGURATION_INVALID"
 
 # Autonomous execution trigger: no behavioral change.
+
+# Groq agent workflow trigger: no behavioral change.
