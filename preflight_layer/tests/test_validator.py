@@ -152,7 +152,8 @@ def test_max_position_size_rejected(monkeypatch, valid_intent, valid_metadata):
     assert result.message == "Order size 0.11 exceeds maximum 0.1."
 
 
-def test_risk_manager_rejection_is_not_bypassed(valid_intent, valid_metadata):
+def test_risk_manager_rejection_is_not_bypassed(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator(risk_manager=RejectingRiskManager())
     account = AccountState(
         balance=Decimal("1000"),
