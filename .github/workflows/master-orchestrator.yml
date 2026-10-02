@@ -24,6 +24,7 @@ jobs:
     env:
       PYTHONUNBUFFERED: "1"
       ORCHESTRATOR_ROOT: ".orchestrator"
+      TASK_ID: ${{ inputs.task_id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
