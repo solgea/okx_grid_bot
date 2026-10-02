@@ -49,7 +49,8 @@ def intent(price="60000.0", size="0.01", leverage="3"):
     )
 
 
-def test_preflight_accepts_aligned_order():
+def test_preflight_accepts_aligned_order(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(intent(), metadata(), account(), market())
     assert result.passed
 
