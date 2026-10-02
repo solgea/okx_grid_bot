@@ -11,9 +11,11 @@ class _PersistentAudit:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.touch(exist_ok=True)
+
     def append(self, event: OrchestratorEvent):
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(asdict(event), sort_keys=True, default=str) + "\\n")
+            handle.write(json.dumps(asdict(event), sort_keys=True, default=str) + "\n")
+
     def events(self, task_id: str):
         events = []
         for line in self.path.read_text(encoding="utf-8").splitlines():
@@ -44,8 +46,11 @@ class PersistentTaskStore:
     def _load(self):
         for path in self.tasks_dir.glob("*.json"):
             payload = json.loads(path.read_text(encoding="utf-8"))
-            task = TaskEnvelope(**payload["task"])
-            task = TaskEnvelope(task.task_id, task.type, task.priority, task.scope, tuple(task.allowed_actions), tuple(task.forbidden_actions), task.success_condition)
+            raw = payload["task"]
+            task = TaskEnvelope(
+                raw["task_id"], raw["type"], raw["priority"], raw["scope"],
+                tuple(raw["allowed_actions"]), tuple(raw["forbidden_actions"]), raw["success_condition"],
+            )
             self._records[task.task_id] = TaskRecord(task, TaskState(payload["state"]), payload["evidence"])
 
     def create(self, task):
