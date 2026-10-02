@@ -53,6 +53,10 @@ class MockRiskManager(IRiskManager):
     def validate_risk(self, account, intent) -> bool: return True  
 
 
+class HaltedRiskManager(MockRiskManager):
+    def is_trading_halted(self) -> bool: return True
+
+
 class RejectingRiskManager(MockRiskManager):
     def validate_risk(self, account, intent) -> bool: return False
 
@@ -64,9 +68,9 @@ def validator():
 def valid_metadata():
     return InstrumentMetadata(
         symbol="TEST-USDT",
-        min_size=Decimal('1.0'),
+        min_size=Decimal('0.01'),
         tick_size=Decimal('0.1'),
-        lot_size=Decimal('1.0'),
+        lot_size=Decimal('0.01'),
         contract_val=Decimal('1.0'),
         is_live=True
     )
@@ -79,7 +83,7 @@ def valid_intent():
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
         price=Decimal('10.5'),
-        size=Decimal('5.0'),
+        size=Decimal('0.05'),
         leverage=Decimal('5.0'),
         margin_mode="cross",
         position_side="long",
@@ -87,7 +91,9 @@ def valid_intent():
         client_order_id="123"
     )
 
-def test_valid_order_passes(validator, valid_intent, valid_metadata):
+def test_valid_order_passes(monkeypatch, validator, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+
     account = AccountState(
         balance=Decimal('1000'), 
         available_margin=Decimal('1000'), 
@@ -105,8 +111,9 @@ def test_valid_order_passes(validator, valid_intent, valid_metadata):
     assert result.passed == True
     assert validator.state == PreFlightState.AUTHORIZED
 
-def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
-    valid_intent.size = Decimal('0.5')
+def test_quantity_below_min_rejected(monkeypatch, validator, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+    valid_intent.size = Decimal('0.005')
     
     account = AccountState(
         balance=Decimal('1000'), 
@@ -126,7 +133,55 @@ def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
     assert result.rejection_code == "PF010_QUANTITY_BELOW_MIN"
 
 
-def test_risk_manager_rejection_is_not_bypassed(valid_intent, valid_metadata):
+def test_max_position_size_rejected(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+    valid_intent.size = Decimal("0.11")
+
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("10"),
+    )
+    market = MarketData(
+        bid=Decimal("10.4"),
+        ask=Decimal("10.6"),
+        last=Decimal("10.5"),
+        timestamp=time.time(),
+    )
+
+    result = PreFlightValidator().validate(valid_intent, valid_metadata, account, market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF018_MAX_SIZE_EXCEEDED"
+    assert result.message == "Order size 0.11 exceeds maximum 0.1."
+
+
+
+
+def test_trading_halted_rejected_with_pf030(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+    validator = PreFlightValidator(risk_manager=HaltedRiskManager())
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("10"),
+    )
+    market = MarketData(
+        bid=Decimal("10.4"),
+        ask=Decimal("10.6"),
+        last=Decimal("10.5"),
+        timestamp=time.time(),
+    )
+
+    result = validator.validate(valid_intent, valid_metadata, account, market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF030_TRADING_HALTED"
+    assert validator.state == PreFlightState.REJECTED
+
+
+def test_risk_manager_rejection_is_not_bypassed(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator(risk_manager=RejectingRiskManager())
     account = AccountState(
         balance=Decimal("1000"),
@@ -149,8 +204,9 @@ def test_risk_manager_rejection_is_not_bypassed(valid_intent, valid_metadata):
 
 @pytest.mark.asyncio
 async def test_order_manager_uses_latest_async_websocket_market_snapshot(
-    validator, valid_intent, valid_metadata
+    monkeypatch, validator, valid_intent, valid_metadata
 ):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     from preflight_layer.domain import AccountState
     from preflight_layer.order_manager import OrderManager
 
@@ -213,3 +269,69 @@ async def test_order_manager_rejects_order_using_async_metadata_update(
 
     assert accepted is False
     assert validator.state == PreFlightState.REJECTED
+
+def test_account_leverage_must_be_positive(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("0"),
+    )
+    market = MarketData(
+        bid=Decimal("10.4"),
+        ask=Decimal("10.6"),
+        last=Decimal("10.5"),
+        timestamp=time.time(),
+    )
+
+    result = PreFlightValidator().validate(valid_intent, valid_metadata, account, market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF027_ACCOUNT_CONFIGURATION_INVALID"
+
+# Autonomous execution trigger: no behavioral change.
+
+# Groq agent workflow trigger: no behavioral change. 
+
+
+
+
+@pytest.mark.asyncio
+async def test_okx_preflight_adapter_fetch_account_state_uses_configured_leverage():
+    from adapters.okx_adapter import OKXPreFlightAdapter
+
+    class FakeExchange:
+        async def fetch_balance(self):
+            return {
+                "USDT": {
+                    "total": 1000.0,
+                    "free": 750.0,
+                }
+            }
+
+    class FakeEngine:
+        exchange = FakeExchange()
+
+    account = await OKXPreFlightAdapter(FakeEngine()).fetch_account_state()
+
+    assert account.balance == Decimal("1000.0")
+    assert account.available_margin == Decimal("750.0")
+    assert account.leverage == Decimal("10")
+
+
+@pytest.mark.asyncio
+async def test_okx_preflight_adapter_maps_missing_last_price_to_unavailable_market_data():
+    from adapters.okx_adapter import OKXPreFlightAdapter
+
+    class FakeExchange:
+        async def fetch_ticker(self, instrument_id):
+            return {"bid": None, "ask": None, "last": None, "timestamp": None}
+
+    class FakeEngine:
+        exchange = FakeExchange()
+
+    market = await OKXPreFlightAdapter(FakeEngine()).fetch_market_data("BTC/USDT:USDT")
+
+    assert market.last == Decimal("0")
+    assert market.bid == Decimal("0")
+    assert market.ask == Decimal("0")

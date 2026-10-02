@@ -4,6 +4,7 @@ from preflight_layer.interfaces import IExchangeAdapter
 from preflight_layer.domain import InstrumentMetadata, AccountState, MarketData
 from engine.exchange import OKXEngine
 from adapters.market_stream import OKXMarketStream
+from config.settings import config
 
 logger = logging.getLogger("OKXPreFlightAdapter")
 
@@ -28,13 +29,10 @@ class OKXPreFlightAdapter(IExchangeAdapter):
 
     async def fetch_instrument_metadata(self, instrument_id: str) -> InstrumentMetadata:
         """
-        CCXT üzerinden yüklenen market verisinden OKX'in ham (raw) swap 
+        CCXT üzerinden yüklenen market verisinden OKX'in ham (raw) swap
         bilgilerini alarak Domain modeline dönüştürür.
         """
-        # OKXEngine.initialize() içinde load_markets() çağrıldığı için veriler önbellektedir
         market = self.okx.exchange.market(instrument_id)
-        
-        # 'info' anahtarı OKX'in bize döndüğü orijinal ham JSON verisini tutar
         raw_info = market.get('info', {})
 
         return InstrumentMetadata(
@@ -50,9 +48,6 @@ class OKXPreFlightAdapter(IExchangeAdapter):
         """
         Hesabın anlık bakiye ve marjin durumunu çeker.
         """
-        # OKXEngine'deki fetch_balance sadece 'total' dönüyor. 
-        # Risk motorunun doğru karar vermesi için 'free' ve 'used' detaylarına ihtiyacımız var.
-        # Bu yüzden doğrudan okx.exchange objesine inerek tam veriyi çekiyoruz.
         balance_data = await self.okx.exchange.fetch_balance()
         usdt_bal = balance_data.get('USDT', {})
 
@@ -68,10 +63,13 @@ class OKXPreFlightAdapter(IExchangeAdapter):
         """
         ticker = await self.okx.exchange.fetch_ticker(instrument_id)
         raw_info = ticker.get('info', {})
+        last = Decimal(str(ticker.get("last") or 0))
+        bid = Decimal(str(ticker.get("bid") or last))
+        ask = Decimal(str(ticker.get("ask") or last))
 
         return MarketData(
-            bid=Decimal(str(ticker.get("bid") or ticker["last"])),
-            ask=Decimal(str(ticker.get("ask") or ticker["last"])),
-            last=Decimal(str(ticker["last"])),
+            bid=bid,
+            ask=ask,
+            last=last,
             timestamp=float(ticker.get("timestamp") or 0) / 1000,
         )

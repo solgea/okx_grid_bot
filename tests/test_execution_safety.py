@@ -49,18 +49,21 @@ def intent(price="60000.0", size="0.01", leverage="3"):
     )
 
 
-def test_preflight_accepts_aligned_order():
+def test_preflight_accepts_aligned_order(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(intent(), metadata(), account(), market())
     assert result.passed
 
 
-def test_preflight_rejects_tick_mismatch():
+def test_preflight_rejects_tick_mismatch(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     result = PreFlightValidator().validate(intent(price="60000.05"), metadata(), account(), market())
     assert not result.passed
     assert result.rejection_code == "PF008_PRICE_TICK_MISMATCH"
 
 
-def test_preflight_rejects_stale_market():
+def test_preflight_rejects_stale_market(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     stale = market()
     stale.timestamp = time.time() - 120
     result = PreFlightValidator().validate(intent(), metadata(), account(), stale)
