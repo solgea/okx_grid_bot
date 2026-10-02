@@ -64,9 +64,9 @@ def validator():
 def valid_metadata():
     return InstrumentMetadata(
         symbol="TEST-USDT",
-        min_size=Decimal('1.0'),
+        min_size=Decimal('0.01'),
         tick_size=Decimal('0.1'),
-        lot_size=Decimal('1.0'),
+        lot_size=Decimal('0.01'),
         contract_val=Decimal('1.0'),
         is_live=True
     )
@@ -79,7 +79,7 @@ def valid_intent():
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
         price=Decimal('10.5'),
-        size=Decimal('5.0'),
+        size=Decimal('0.05'),
         leverage=Decimal('5.0'),
         margin_mode="cross",
         position_side="long",
@@ -124,6 +124,28 @@ def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
     result = validator.validate(valid_intent, valid_metadata, account, market)
     assert result.passed == False
     assert result.rejection_code == "PF010_QUANTITY_BELOW_MIN"
+
+
+def test_max_position_size_rejected(valid_intent, valid_metadata):
+    valid_intent.size = Decimal("0.11")
+
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("10"),
+    )
+    market = MarketData(
+        bid=Decimal("10.4"),
+        ask=Decimal("10.6"),
+        last=Decimal("10.5"),
+        timestamp=time.time(),
+    )
+
+    result = PreFlightValidator().validate(valid_intent, valid_metadata, account, market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF018_MAX_SIZE_EXCEEDED"
+    assert result.message == "Order size 0.11 exceeds maximum 0.1."
 
 
 def test_risk_manager_rejection_is_not_bypassed(valid_intent, valid_metadata):
