@@ -242,7 +242,8 @@ async def test_order_manager_rejects_order_using_async_metadata_update(
     assert accepted is False
     assert validator.state == PreFlightState.REJECTED
 
-def test_account_leverage_must_be_positive(valid_intent, valid_metadata):
+def test_account_leverage_must_be_positive(monkeypatch, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     account = AccountState(
         balance=Decimal("1000"),
         available_margin=Decimal("1000"),
