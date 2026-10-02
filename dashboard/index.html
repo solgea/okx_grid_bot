@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131b">
+  <title>OKX Agent Desk · Paper Trading</title>
+  <style>
+    :root{color-scheme:dark;--bg:#10131b;--panel:#171b26;--line:#292f3e;--muted:#8d96a9;--text:#f2f4f8;--green:#4cdda2;--red:#ff7385;--blue:#879cff;--amber:#f4c46d}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    .shell{max-width:1440px;margin:auto;padding:30px 36px 50px}.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+    .brand{display:flex;align-items:center;gap:13px}.brand-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#29345c;color:#a8b5ff;font-size:20px}
+    h1{font-size:20px;margin:0;letter-spacing:-.4px}.subtle,.eyebrow{color:var(--muted)}.subtle{font-size:12px;margin-top:2px}
+    .live-tag,.paper-tag{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:20px;padding:7px 11px;font-size:11px;color:#cbd1de}
+    .dot{width:7px;height:7px;border-radius:100%;background:var(--amber)}.dot.ok{background:var(--green);box-shadow:0 0 9px #4cdda277}.dot.bad{background:var(--red)}
+    .notice{display:flex;gap:11px;align-items:center;border:1px solid #634d2d;background:#211c15;color:#f2d69d;padding:12px 16px;border-radius:12px;margin-bottom:19px;font-size:12px}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px}
+    .eyebrow{text-transform:uppercase;font-size:10px;letter-spacing:1px;font-weight:650}.metric{font-size:25px;font-weight:650;letter-spacing:-.8px;margin-top:12px}.metric-foot{font-size:11px;color:var(--muted);margin-top:4px}
+    .positive{color:var(--green)}.negative{color:var(--red)}.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,.9fr);gap:15px;margin-bottom:15px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}.section-head h2{font-size:14px;margin:0;font-weight:600}
+    .market-price{font-size:26px;font-weight:650;letter-spacing:-.7px}.market-label{color:var(--muted);font-size:11px}.chart-wrap{height:190px;margin:12px -2px 0}.chart-wrap svg{width:100%;height:100%;overflow:visible}
+    .trade-form,.agent-form{display:grid;gap:11px}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{display:grid;gap:6px;color:var(--muted);font-size:11px}
+    input,select{width:100%;border:1px solid var(--line);border-radius:9px;background:#11151e;padding:10px 11px;color:var(--text);font:inherit;outline:none}input:focus,select:focus{border-color:#7489ff}
+    .button-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.button{border:0;border-radius:9px;padding:10px 12px;background:#30385a;color:white;font:600 12px inherit;cursor:pointer}.button:hover{filter:brightness(1.15)}.button:disabled{opacity:.42;cursor:not-allowed}
+    .buy{background:#164634;color:#79efba}.sell{background:#522933;color:#ffa5ad}.secondary{border:1px solid var(--line);background:transparent;color:#c9d0dd}.small{font-size:11px;padding:7px 9px}
+    .hint{color:var(--muted);font-size:10px;margin:0}.agents,.fills{display:grid;gap:10px}
+    .agent{border:1px solid var(--line);background:#131721;border-radius:11px;padding:13px}.agent-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.agent-name{font-size:12px;font-weight:600}.agent-meta{color:var(--muted);font-size:10px;margin-top:4px}
+    .status{font-size:10px;border-radius:20px;padding:4px 8px;background:#252a37;color:#b7bfce}.status.active{background:#18382d;color:#76e1ac}.status.warning{background:#3b2d1d;color:#f4c46d}
+    .agent-controls{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}.empty{padding:26px 10px;text-align:center;color:var(--muted);font-size:11px;border:1px dashed var(--line);border-radius:10px}
+    .wide{grid-column:1/-1}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;font-size:11px}th{color:var(--muted);font-weight:500}td{color:#d6dae4}
+    .notice-error{border-color:#6a3440;background:#26171b;color:#ffc0c7}.loading{color:var(--muted);padding:25px;text-align:center}.toast{position:fixed;right:22px;bottom:22px;max-width:360px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#222734;box-shadow:0 12px 35px #0007;display:none;font-size:12px}
+    .demo-banner{border-color:#48538b;background:#1a2034;color:#c7d0ff}.demo-card{border-color:#3b456e}.demo-error{border:1px solid #6a3440;background:#26171b;color:#ffc0c7;padding:11px;border-radius:9px;font-size:11px}.demo-summary{display:flex;flex-wrap:wrap;gap:10px 22px;color:var(--muted);font-size:11px}.demo-summary b{color:var(--text)}.pill{padding:4px 8px;border-radius:20px;background:#262d40;color:#bfcaff;font-size:10px}
+    @media(max-width:850px){.shell{padding:22px 16px 36px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+    @media(max-width:480px){.topbar{align-items:flex-start;gap:12px;flex-direction:column}.metrics{gap:9px}.card{padding:14px}.metric{font-size:21px}.chart-wrap{height:150px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">⌁</div><div><h1>Agent Desk</h1><div class="subtle">OKX perpetual swap · Demo ve paper trading ayrı hesaplar</div></div></div>
+      <div class="live-tag"><span id="market-dot" class="dot"></span><span id="market-label">Fiyat akışı bekleniyor</span></div>
+    </header>
+    <div class="notice"><span>ⓘ</span><span><b>Paper ve Demo hesapları ayrı.</b> Paper emirler yalnızca simüle edilir; aşağıdaki onaylı Demo emirleri OKX Demo hesabına gönderilir. Canlı hesap kullanılmaz.</span></div>
+    <section class="metrics">
+      <article class="card"><div class="eyebrow">Portföy değeri</div><div id="equity" class="metric">—</div><div id="balance-foot" class="metric-foot">10.000,00 USDT sanal başlangıç</div></article>
+      <article class="card"><div class="eyebrow">Toplam kâr / zarar</div><div id="total-pnl" class="metric">—</div><div id="pnl-foot" class="metric-foot">Gerçekleşen + açık pozisyon</div></article>
+      <article class="card"><div class="eyebrow">Açık pozisyonlar</div><div id="position-count" class="metric">0</div><div id="position-foot" class="metric-foot">Sanal swap pozisyonu</div></article>
+      <article class="card"><div class="eyebrow">Kullanılabilir teminat</div><div id="margin" class="metric">—</div><div class="metric-foot">Maksimum ajan kaldıracı 5×</div></article>
+    </section>
+    <section class="card demo-card" style="margin-bottom:15px">
+      <div class="section-head"><div><h2>OKX Demo hesabı</h2><div class="market-label">Gerçek OKX Demo bakiyesi ve pozisyonları · Paper portföyünden ayrı</div></div><span class="pill">DEMO · GERÇEK EMİRLER</span></div>
+      <div id="demo-account" class="agents"><div class="loading">Demo hesabı bağlantısı kontrol ediliyor…</div></div>
+      <div class="section-head" style="margin-top:18px"><h2>Onaylı Demo swap emri</h2><span class="market-label">Emir başına üst sınır: 1 kontrat</span></div>
+      <form id="demo-order-form" class="trade-form">
+        <div class="field-row">
+          <label>Emir türü<select id="demo-order-type"><option value="limit">Limit</option><option value="market">Market</option></select></label>
+          <label>Yön<select id="demo-side"><option value="buy">Al / Long</option><option value="sell">Sat / Short</option></select></label>
+        </div>
+        <div class="field-row">
+          <label>Kontrat<input id="demo-contracts" type="number" min="0.01" max="1" step="0.01" value="0.01" required></label>
+          <label id="demo-price-field">Limit fiyatı (USDT)<input id="demo-price" type="number" min="0" step="any" placeholder="Örn. 3500" required></label>
+        </div>
+        <button id="demo-submit" class="button buy" type="submit" disabled>Demo emrini incele ve onayla</button>
+        <p class="hint">Sadece OKX Demo ortamı · Hesabın kaldıraç ayarı değiştirilmez · Her emir için ayrıca onay istenir.</p>
+      </form>
+      <div class="section-head" style="margin-top:18px"><h2>Demo açık pozisyonları</h2></div>
+      <div id="demo-positions" class="agents"><div class="empty">Demo hesabı henüz yüklenmedi.</div></div>
+      <div class="section-head" style="margin-top:18px"><h2>Demo açık emirleri</h2></div>
+      <div id="demo-orders" class="table-wrap"><div class="empty">Demo hesabı henüz yüklenmedi.</div></div>
+    </section>
+    <section class="grid">
+      <article class="card">
+        <div class="section-head"><div><h2>OKX piyasa fiyatı</h2><div class="market-label">ETH-USDT-SWAP · Her 3 saniyede güncellenir</div></div><span class="paper-tag">PAPER</span></div>
+        <div id="price" class="market-price">— <span class="market-label">USDT</span></div>
+        <div class="chart-wrap"><svg id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="Son fiyat hareketleri"></svg></div>
+      </article>
+      <article class="card">
+        <div class="section-head"><h2>Manuel paper emir</h2></div>
+        <form id="trade-form" class="trade-form">
+          <label>Ajan<select id="trade-agent" required></select></label>
+          <div class="field-row">
+            <label>Kontrat<input id="trade-size" type="number" min="1" max="100" value="1" required></label>
+            <label>Kaldıraç<input type="text" value="Ajana göre" disabled></label>
+          </div>
+          <div class="button-row"><button class="button buy" type="button" id="buy-btn">Al / Long</button><button class="button sell" type="button" id="sell-btn">Sat / Short</button></div>
+          <p class="hint">1 kontrat = 0,01 ETH · İşlem komisyonu simülasyonu %0,05</p>
+        </form>
+        <div style="height:18px"></div>
+        <div class="section-head"><h2>Yeni işlem ajanı</h2></div>
+        <form id="agent-form" class="agent-form">
+          <label>Ajan adı<input id="agent-name" maxlength="40" value="Trend ajanı" required></label>
+          <div class="field-row"><label>Kontrat<input id="agent-size" type="number" min="1" max="100" value="1" required></label><label>Kaldıraç<input id="agent-leverage" type="number" min="1" max="5" value="2" required></label></div>
+          <button class="button" type="submit">+ Ajan oluştur</button>
+          <p class="hint">Kural tabanlı EMA 9/21 kesişimi · %10 zarar sınırı · Maksimum 10 ajan</p>
+        </form>
+      </article>
+      <article class="card">
+        <div class="section-head"><h2>İşlem ajanları</h2><span id="agent-count" class="market-label">0 ajan</span></div>
+        <div id="agents" class="agents"><div class="loading">Durum alınıyor…</div></div>
+      </article>
+      <article class="card">
+        <div class="section-head"><h2>Açık pozisyonlar</h2><span class="market-label">USDT teminatlı swap</span></div>
+        <div id="positions" class="agents"><div class="empty">Açık sanal pozisyon yok.</div></div>
+      </article>
+      <article class="card wide">
+        <div class="section-head"><h2>Son işlemler</h2><span class="market-label">Bu cihazda saklanan sanal işlem günlüğü</span></div>
+        <div id="fills" class="table-wrap"><div class="empty">Henüz işlem yok.</div></div>
+      </article>
+    </section>
+    <p class="hint">Demo emirleri gerçek para kullanmasa da OKX Demo hesabında gerçekleşir; emir vermeden önce her zaman hesap ve pozisyon bilgilerini doğrulayın. Otomatik ajan yalnızca paper ortamında çalışır ve yatırım tavsiyesi değildir.</p>
+  </main>
+  <div id="toast" class="toast" role="status"></div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let agents = [];
+    let toastTimer;
+    function money(value) {
+      return value == null ? "—" : Number(value).toLocaleString("tr-TR", {minimumFractionDigits:2, maximumFractionDigits:2}) + " USDT";
+    }
+    function showToast(message, error = false) {
+      const toast = $("toast");
+      toast.textContent = message;
+      toast.style.borderColor = error ? "#8b3d49" : "#406d5a";
+      toast.style.display = "block";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.style.display = "none", 3600);
+    }
+    async function request(path, body) {
+      const response = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {cache:"no-store"});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "İstek başarısız.");
+      return data;
+    }
+    function renderChart(values) {
+      const svg = $("chart");
+      if (!values || values.length < 2) { svg.replaceChildren(); return; }
+      const low = Math.min(...values), high = Math.max(...values), spread = high - low || 1;
+      const points = values.map((value, index) => `${(index / (values.length - 1)) * 720},${175 - ((value - low) / spread) * 155}`).join(" ");
+      const fill = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      fill.setAttribute("points", `0,190 ${points} 720,190`);
+      fill.setAttribute("fill", "url(#area)");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      line.setAttribute("points", points);
+      line.setAttribute("fill", "none");
+      line.setAttribute("stroke", values.at(-1) >= values[0] ? "#4cdda2" : "#ff7385");
+      line.setAttribute("stroke-width", "2.5");
+      line.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.innerHTML = '<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4cdda2" stop-opacity=".2"/><stop offset="100%" stop-color="#4cdda2" stop-opacity="0"/></linearGradient></defs>';
+      svg.append(fill, line);
+    }
+    function renderAgents(items) {
+      agents = items;
+      $("agent-count").textContent = `${items.length} / 10 ajan`;
+      $("agents").innerHTML = items.length ? items.map((agent) => `
+        <div class="agent"><div class="agent-top"><div><div class="agent-name">${escapeHtml(agent.name)}</div><div class="agent-meta">${agent.strategy} · ${agent.contracts} kontrat · ${agent.leverage}×</div></div>
+        <span class="status ${agent.active ? "active" : agent.halt_reason ? "warning" : ""}">${agent.active ? "Çalışıyor" : agent.halt_reason ? "Risk durdurdu" : "Durduruldu"}</span></div>
+        <div class="agent-meta">${escapeHtml(agent.halt_reason || agent.signal)}</div>
+        <div class="agent-controls"><button class="button small ${agent.active ? "secondary" : ""}" data-action="${agent.active ? "stop" : "start"}" data-agent="${agent.id}">${agent.active ? "Durdur" : "Başlat"}</button>
+        <button class="button small secondary" data-action="close" data-agent="${agent.id}">Pozisyonu kapat</button></div></div>`).join("") : '<div class="empty">Henüz ajan yok. İlk ajanınızı oluşturun.</div>';
+      $("trade-agent").innerHTML = items.length ? items.map((agent) => `<option value="${agent.id}">${escapeHtml(agent.name)} (${agent.leverage}×)</option>`).join("") : '<option value="">Önce ajan oluşturun</option>';
+      document.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", async () => {
+        try {
+          await request(`/api/agents/${button.dataset.agent}/${button.dataset.action}`, {});
+          await refresh();
+        } catch (error) { showToast(error.message, true); }
+      }));
+      $("buy-btn").disabled = $("sell-btn").disabled = items.length === 0;
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+    }
+    function renderPositions(items) {
+      $("position-count").textContent = items.length;
+      $("position-foot").textContent = items.length ? `${items.length} açık paper pozisyonu` : "Sanal swap pozisyonu";
+      $("positions").innerHTML = items.length ? items.map((position) => `
+        <div class="agent"><div class="agent-top"><div><div class="agent-name">${escapeHtml(position.agent_name)} · ${position.side === "long" ? "Long" : "Short"}</div>
+        <div class="agent-meta">${position.contracts} kontrat · ${position.leverage}× · giriş ${money(position.entry_price)}</div></div>
+        <strong class="${position.unrealized_pnl >= 0 ? "positive" : "negative"}">${money(position.unrealized_pnl)}</strong></div></div>`).join("") : '<div class="empty">Açık sanal pozisyon yok.</div>';
+    }
+    function renderFills(fills) {
+      $("fills").innerHTML = fills.length ? `<table><thead><tr><th>Zaman</th><th>Ajan</th><th>Yön</th><th>Kontrat</th><th>Fiyat</th><th>Gerçekleşen K/Z</th><th>Tip</th></tr></thead><tbody>${fills.slice(0,12).map((fill) => `
+        <tr><td>${new Date(fill.time * 1000).toLocaleTimeString("tr-TR")}</td><td>${escapeHtml(fill.agent_name)}</td><td class="${fill.side === "buy" ? "positive" : "negative"}">${fill.side === "buy" ? "Alış" : "Satış"}</td><td>${fill.contracts}</td><td>${Number(fill.price).toLocaleString("tr-TR",{minimumFractionDigits:2})}</td><td class="${fill.realized_pnl >= 0 ? "positive" : "negative"}">${money(fill.realized_pnl)}</td><td>${escapeHtml(fill.source)}</td></tr>`).join("")}</tbody></table>` : '<div class="empty">Henüz işlem yok.</div>';
+    }
+    function renderDemo(state) {
+      const container = $("demo-account");
+      if (!state.connected) {
+        $("demo-submit").disabled = true;
+        container.innerHTML = `<div class="demo-error">${escapeHtml(state.error || "OKX Demo hesabına henüz bağlanılamadı.")} API bilgileri hiçbir zaman sayfada gösterilmez; anahtarlar yalnızca yerel .env dosyasından okunur.</div>`;
+        $("demo-positions").innerHTML = '<div class="empty">Demo hesabı bağlantısı kurulmadı.</div>';
+        $("demo-orders").innerHTML = '<div class="empty">Demo hesabı bağlantısı kurulmadı.</div>';
+        return;
+      }
+      $("demo-submit").disabled = false;
+      container.innerHTML = `<div class="demo-summary"><span>Hesap <b>OKX Demo</b></span><span>Serbest USDT <b>${money(state.balance)}</b></span><span>Toplam USDT <b>${money(state.total_balance)}</b></span><span>Enstrüman <b>${escapeHtml(state.instrument)}</b></span></div>`;
+      $("demo-positions").innerHTML = state.positions.length ? state.positions.map((position) => `
+        <div class="agent"><div class="agent-top"><div><div class="agent-name">${position.side === "long" ? "Long" : "Short"} · ${position.contracts} kontrat</div><div class="agent-meta">Giriş ${money(position.entry_price)} · piyasa ${money(position.mark_price)} · kaldıraç ${position.leverage ?? "—"}×</div></div><strong class="${(position.unrealized_pnl ?? 0) >= 0 ? "positive" : "negative"}">${money(position.unrealized_pnl)}</strong></div></div>`).join("") : '<div class="empty">Demo hesabında açık pozisyon yok.</div>';
+      $("demo-orders").innerHTML = state.open_orders.length ? `<table><thead><tr><th>Emir ID</th><th>Yön</th><th>Tür</th><th>Miktar</th><th>Fiyat</th><th>Durum</th></tr></thead><tbody>${state.open_orders.map((order) => `
+        <tr><td>${escapeHtml(order.id)}</td><td>${escapeHtml(order.side)}</td><td>${escapeHtml(order.type)}</td><td>${order.amount ?? "—"}</td><td>${order.price == null ? "Piyasa" : money(order.price)}</td><td>${escapeHtml(order.status)}</td></tr>`).join("")}</tbody></table>` : '<div class="empty">Bekleyen Demo emri yok.</div>';
+    }
+    async function refresh() {
+      try {
+        const state = await request("/api/state");
+        const demo = await request("/api/demo/state");
+        $("market-dot").className = `dot ${state.market_connected ? "ok" : state.market_error ? "bad" : ""}`;
+        $("market-label").textContent = state.market_connected ? "OKX fiyat akışı bağlı" : state.market_error ? "Fiyat akışı hatası" : "Fiyat akışı bekleniyor";
+        $("price").innerHTML = state.price == null ? "— <span class=\"market-label\">USDT</span>" : `${Number(state.price).toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="market-label">USDT</span>`;
+        $("equity").textContent = money(state.equity);
+        $("balance-foot").textContent = `Bakiye ${money(state.balance)} · sanal başlangıç ${money(state.initial_balance)}`;
+        $("total-pnl").textContent = money(state.total_pnl);
+        $("total-pnl").className = `metric ${state.total_pnl >= 0 ? "positive" : "negative"}`;
+        $("pnl-foot").textContent = `Gerçekleşen ${money(state.realized_pnl)} · açık ${money(state.unrealized_pnl)}`;
+        $("margin").textContent = money(state.available_margin);
+        renderChart(state.price_history);
+        renderAgents(state.agents);
+        renderPositions(state.positions);
+        renderFills(state.fills);
+        renderDemo(demo);
+      } catch (error) { showToast(error.message, true); }
+    }
+    async function placeOrder(side) {
+      try {
+        await request("/api/orders", {agent_id:$("trade-agent").value, side, contracts:Number($("trade-size").value)});
+        showToast(side === "buy" ? "Paper alış emri kaydedildi." : "Paper satış emri kaydedildi.");
+        await refresh();
+      } catch (error) { showToast(error.message, true); }
+    }
+    $("buy-btn").addEventListener("click", () => placeOrder("buy"));
+    $("sell-btn").addEventListener("click", () => placeOrder("sell"));
+    $("agent-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await request("/api/agents", {name:$("agent-name").value, contracts:Number($("agent-size").value), leverage:Number($("agent-leverage").value)});
+        showToast("Paper trading ajanı oluşturuldu.");
+        $("agent-name").value = "Trend ajanı";
+        await refresh();
+      } catch (error) { showToast(error.message, true); }
+    });
+    $("demo-order-type").addEventListener("change", () => {
+      const isLimit = $("demo-order-type").value === "limit";
+      $("demo-price-field").style.display = isLimit ? "grid" : "none";
+      $("demo-price").required = isLimit;
+    });
+    $("demo-order-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const type = $("demo-order-type").value;
+      const side = $("demo-side").value;
+      const contracts = Number($("demo-contracts").value);
+      const price = type === "limit" ? Number($("demo-price").value) : null;
+      const priceMessage = type === "limit" ? `Limit fiyatı ${price} USDT` : "Piyasa fiyatı";
+      const orderMessage = `OKX DEMO emrini onaylıyor musunuz?\n\nYön: ${side === "buy" ? "Al / Long" : "Sat / Short"}\nTür: ${type === "limit" ? "Limit" : "Market"}\nEnstrüman: ETH-USDT-SWAP\nKontrat: ${contracts}\n${priceMessage}\n\nBu emir OKX Demo hesabına gönderilecek, paper hesaba değil.`;
+      if (!window.confirm(orderMessage)) return;
+      try {
+        const result = await request("/api/demo/orders", {side, type, contracts, price, confirm:true});
+        showToast(`OKX Demo emri gönderildi · ${result.order.id || result.order.status}`);
+        await refresh();
+      } catch (error) { showToast(error.message, true); }
+    });
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>
