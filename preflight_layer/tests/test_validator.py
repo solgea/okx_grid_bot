@@ -87,7 +87,9 @@ def valid_intent():
         client_order_id="123"
     )
 
-def test_valid_order_passes(validator, valid_intent, valid_metadata):
+def test_valid_order_passes(monkeypatch, validator, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+
     account = AccountState(
         balance=Decimal('1000'), 
         available_margin=Decimal('1000'), 
