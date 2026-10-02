@@ -6,7 +6,7 @@ from config.settings import config
 from preflight_layer.domain import (
     OrderIntent, InstrumentMetadata, AccountState, MarketData,
     PreFlightState, ValidationResult, ValidationCheck,
-    PF002_INSTRUMENT_NOT_LIVE, PF004_INVALID_TICK_SIZE, PF005_INVALID_LOT_SIZE,
+    PF001_INVALID_INSTRUMENT, PF002_INSTRUMENT_NOT_LIVE, PF004_INVALID_TICK_SIZE, PF005_INVALID_LOT_SIZE,
     PF006_INVALID_MIN_SIZE, PF007_INVALID_PRICE, PF008_PRICE_TICK_MISMATCH,
     PF009_INVALID_QUANTITY, PF010_QUANTITY_BELOW_MIN, PF011_QUANTITY_LOT_MISMATCH,
     PF015_INVALID_LEVERAGE, PF016_LEVERAGE_EXCEEDED, PF017_INSUFFICIENT_MARGIN,
@@ -45,6 +45,13 @@ class PreFlightValidator:
 
         if metadata is None:
             self.state = self._reject(result, PF026_MARKET_DATA_UNAVAILABLE, "Instrument metadata unavailable.")
+            return result
+        if intent.instrument_id != metadata.symbol:
+            self.state = self._reject(
+                result,
+                PF001_INVALID_INSTRUMENT,
+                f"Instrument {intent.instrument_id} does not match metadata symbol {metadata.symbol}.",
+            )
             return result
         if not metadata.is_live:
             self.state = self._reject(result, PF002_INSTRUMENT_NOT_LIVE, "Instrument is not live.")
