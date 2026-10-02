@@ -56,7 +56,7 @@ async def main():
             margin_mode=config.MARGIN_MODE,
             position_side="net",
             reduce_only=False,
-            client_order_id="g9-demo-once",
+            client_order_id="g9demo01",
         )
 
         validator = PreFlightValidator()
@@ -72,7 +72,7 @@ async def main():
             float(size),
             float(order_price),
             "limit",
-            params={"tdMode": config.MARGIN_MODE, "clOrdId": "g9-demo-once"},
+            params={"tdMode": config.MARGIN_MODE, "clOrdId": "g9demo01"},
         )
 
         evidence = {
