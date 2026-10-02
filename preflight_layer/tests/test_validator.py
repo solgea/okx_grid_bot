@@ -260,3 +260,5 @@ def test_account_leverage_must_be_positive(monkeypatch, valid_intent, valid_meta
 
     assert result.passed is False
     assert result.rejection_code == "PF027_ACCOUNT_CONFIGURATION_INVALID"
+
+# Autonomous execution trigger: no behavioral change.
