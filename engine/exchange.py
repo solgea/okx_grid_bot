@@ -38,19 +38,31 @@ class OKXEngine:
             self.connected = True
             self.connection_generation += 1
 
-            # OKX/CCXT handle margin mode and leverage as separate operations.
+            # OKX uses tdMode on each order to select cross/isolated margin.
+            # set_margin_mode() is therefore intentionally not called here:
+            # current CCXT requires a leverage parameter for that method on OKX,
+            # and calling it during startup produced a misleading local failure.
+            # The configured leverage is applied explicitly with the required
+            # margin-mode parameter and must succeed; otherwise initialization
+            # fails closed rather than continuing with an unknown leverage.
             try:
-                await self.exchange.set_margin_mode(config.MARGIN_MODE, config.SYMBOL)
-            except Exception as exc:
-                logger.warning("Margin mode could not be changed: %s", exc)
-
-            try:
-                await self.exchange.set_leverage(int(config.LEVERAGE), config.SYMBOL)
-            except Exception as exc:
-                logger.warning("Leverage could not be changed: %s", exc)
+                await self.exchange.set_leverage(
+                    int(config.LEVERAGE),
+                    config.SYMBOL,
+                    {"marginMode": config.MARGIN_MODE, "posSide": "net"},
+                )
+            except Exception:
+                logger.exception(
+                    "OKX leverage initialization failed: symbol=%s margin=%s leverage=%sx",
+                    config.SYMBOL,
+                    config.MARGIN_MODE,
+                    config.LEVERAGE,
+                )
+                self.connected = False
+                raise
 
             logger.info(
-                "OKX initialized: symbol=%s margin=%s leverage=%sx demo=%s",
+                "OKX initialized: symbol=%s order_margin=%s leverage=%sx demo=%s",
                 config.SYMBOL, config.MARGIN_MODE, config.LEVERAGE, config.IS_DEMO,
             )
         except Exception:
