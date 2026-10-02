@@ -153,8 +153,9 @@ class OKXEngine:
 
     async def fetch_open_orders(self, symbol=None):
         symbol = symbol or config.SYMBOL
-        if config.DRY_RUN:
-            return []
+        # An empty order book is valid only when the exchange explicitly
+        # confirms it. Network/disconnect errors must propagate so callers
+        # never reconcile against a fabricated empty snapshot.
         try:
             return await self.exchange.fetch_open_orders(symbol)
         except Exception:
