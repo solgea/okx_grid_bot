@@ -293,3 +293,27 @@ def test_account_leverage_must_be_positive(monkeypatch, valid_intent, valid_meta
 
 # Groq agent workflow trigger: no behavioral change. 
 
+
+
+
+@pytest.mark.asyncio
+async def test_okx_preflight_adapter_fetch_account_state_uses_configured_leverage():
+    from adapters.okx_adapter import OKXPreFlightAdapter
+
+    class FakeExchange:
+        async def fetch_balance(self):
+            return {
+                "USDT": {
+                    "total": 1000.0,
+                    "free": 750.0,
+                }
+            }
+
+    class FakeEngine:
+        exchange = FakeExchange()
+
+    account = await OKXPreFlightAdapter(FakeEngine()).fetch_account_state()
+
+    assert account.balance == Decimal("1000.0")
+    assert account.available_margin == Decimal("750.0")
+    assert account.leverage == Decimal("10")
