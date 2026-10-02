@@ -20,12 +20,15 @@ def metadata():
     return InstrumentMetadata(symbol="BTC/USDT:USDT", min_size=Decimal("0.01"), tick_size=Decimal("0.1"), lot_size=Decimal("0.01"), contract_val=Decimal("0.01"), is_live=True)
 
 def test_g8_2_rejects_quantity_above_position_limit(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     monkeypatch.setattr("config.settings.config.MAX_POSITION_SIZE", 0.1)
     result = PreFlightValidator().validate(intent(size="0.11"), metadata(), account(), market())
     assert not result.passed
     assert result.rejection_code == "PF018_MAX_SIZE_EXCEEDED"
 
-def test_g8_2_rejects_lot_misalignment():
+def test_g8_2_rejects_lot_misalignment(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
+
     result = PreFlightValidator().validate(intent(size="0.015"), metadata(), account(), market())
     assert not result.passed
     assert result.rejection_code == "PF011_QUANTITY_LOT_MISMATCH"
