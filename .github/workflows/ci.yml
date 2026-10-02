@@ -24,3 +24,5 @@ jobs:
         run: pytest -q
       - name: Docker build
         run: docker build -t okx-grid-bot:ci .
+
+      # Phase 2 — main validation trigger
