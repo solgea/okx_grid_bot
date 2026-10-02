@@ -123,7 +123,7 @@ def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
     
     result = validator.validate(valid_intent, valid_metadata, account, market)
     assert result.passed == False
-    assert result.rejection_code == "MIN_SIZE_VIOLATION"
+    assert result.rejection_code == "PF010_QUANTITY_BELOW_MIN"
 
 
 def test_risk_manager_rejection_is_not_bypassed(valid_intent, valid_metadata):
