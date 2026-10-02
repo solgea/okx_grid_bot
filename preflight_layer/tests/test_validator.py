@@ -176,8 +176,9 @@ def test_risk_manager_rejection_is_not_bypassed(monkeypatch, valid_intent, valid
 
 @pytest.mark.asyncio
 async def test_order_manager_uses_latest_async_websocket_market_snapshot(
-    validator, valid_intent, valid_metadata
+    monkeypatch, validator, valid_intent, valid_metadata
 ):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     from preflight_layer.domain import AccountState
     from preflight_layer.order_manager import OrderManager
 
