@@ -16,13 +16,15 @@ def intent(price="60000", size="0.01", leverage="3"):
         margin_mode="cross", position_side="net", reduce_only=False, client_order_id="g8"
     )
 
-def test_g8_1_rejects_instrument_identity_mismatch():
+def test_g8_1_rejects_instrument_identity_mismatch(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     metadata = InstrumentMetadata(symbol="ETH/USDT:USDT", min_size=Decimal("0.01"), tick_size=Decimal("0.1"), lot_size=Decimal("0.01"), contract_val=Decimal("0.01"), is_live=True)
     result = PreFlightValidator().validate(intent(), metadata, account(), market())
     assert not result.passed
     assert result.rejection_code == "PF001_INVALID_INSTRUMENT"
 
-def test_g8_1_rejects_invalid_exchange_metadata():
+def test_g8_1_rejects_invalid_exchange_metadata(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     metadata = InstrumentMetadata(symbol="BTC/USDT:USDT", min_size=Decimal("0.01"), tick_size=Decimal("0"), lot_size=Decimal("0.01"), contract_val=Decimal("0.01"), is_live=True)
     result = PreFlightValidator().validate(intent(), metadata, account(), market())
     assert not result.passed
