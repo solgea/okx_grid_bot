@@ -159,10 +159,11 @@ async def test_order_manager_uses_latest_async_websocket_market_snapshot(
         available_margin=Decimal("1000"),
         leverage=Decimal("10"),
     )
+    current_time_ms = int(time.time() * 1000)
     adapter = AsyncWebSocketAdapter(
         snapshots=[
-            {"bidPx": "10.3", "askPx": "10.5", "last": "10.4", "ts": 1_700_000_000_000},
-            {"bidPx": "10.4", "askPx": "10.6", "last": "10.5", "ts": 1_700_000_001_000},
+            {"bidPx": "10.3", "askPx": "10.5", "last": "10.4", "ts": current_time_ms},
+            {"bidPx": "10.4", "askPx": "10.6", "last": "10.5", "ts": current_time_ms + 1000},
         ],
         account=account,
         metadata=valid_metadata,
@@ -175,7 +176,7 @@ async def test_order_manager_uses_latest_async_websocket_market_snapshot(
         "bidPx": "10.4",
         "askPx": "10.6",
         "last": "10.5",
-        "ts": 1_700_000_001_000,
+        "ts": current_time_ms + 1000,
     }
     assert validator.state == PreFlightState.AUTHORIZED
 
