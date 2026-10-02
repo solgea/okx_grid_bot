@@ -106,7 +106,7 @@ def test_valid_order_passes(validator, valid_intent, valid_metadata):
     assert validator.state == PreFlightState.AUTHORIZED
 
 def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
-    valid_intent.size = Decimal('0.5')
+    valid_intent.size = Decimal('0.005')
     
     account = AccountState(
         balance=Decimal('1000'), 
