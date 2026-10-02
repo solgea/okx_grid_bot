@@ -2,6 +2,7 @@ import argparse, json, sys
 from pathlib import Path
 from orchestrator.core.policy import DefaultPolicyEngine
 from orchestrator.execution.dispatcher import ActionDispatcher
+from orchestrator.execution.runtime import build_commit_executor, build_test_executor
 from orchestrator.agents.planner_agent import PlannerAgent
 from orchestrator.agents.engineering_agent import EngineeringAgent
 from orchestrator.agents.test_agent import TestAgent
@@ -10,8 +11,8 @@ from .runtime.service import RuntimeService
 
 def _service(root):
     policy = DefaultPolicyEngine()
-    agents = {"planner": PlannerAgent(), "engineering": EngineeringAgent(), "test": TestAgent(), "reviewer": ReviewerAgent()}
-    return RuntimeService(root, policy, ActionDispatcher(agents, policy), agents)
+    agents = {"planner": PlannerAgent(), "engineering": EngineeringAgent(), "test": TestAgent(build_test_executor()), "reviewer": ReviewerAgent()}
+    return RuntimeService(root, policy, ActionDispatcher(agents, policy), agents, commit_executor=build_commit_executor())
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="python -m orchestrator.cli")
