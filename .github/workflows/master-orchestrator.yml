@@ -3,10 +3,16 @@ name: Master Orchestrator Runtime
 on:
   workflow_dispatch:
     inputs:
+      task_id:
+        description: "Validated orchestrator task ID"
+        required: true
+        type: string
       task_json:
         description: "Validated orchestrator task envelope as JSON"
         required: true
         type: string
+
+run-name: Master Orchestrator / ${{ inputs.task_id }}
 
 permissions:
   contents: read
@@ -34,6 +40,7 @@ jobs:
       - name: Materialize task envelope
         env:
           TASK_JSON: ${{ inputs.task_json }}
+          TASK_ID: ${{ inputs.task_id }}
         run: |
           python - <<'PY'
           import json
@@ -53,6 +60,8 @@ jobs:
           missing = sorted(required - payload.keys())
           if missing:
               raise SystemExit(f"invalid task envelope; missing: {missing}")
+          if payload["task_id"] != os.environ["TASK_ID"]:
+              raise SystemExit("task_id input does not match task envelope")
 
           Path("task.json").write_text(
               json.dumps(payload, indent=2) + "\n",
@@ -66,21 +75,13 @@ jobs:
 
       - name: Execute task through Master Orchestrator
         run: |
-          TASK_ID="$(python - <<'PY'
-          import json
-          print(json.load(open("task.json", encoding="utf-8"))["task_id"])
-          PY
-          )"
           python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" run "$TASK_ID"
 
       - name: Capture lifecycle status
         if: always()
+        env:
+          TASK_ID: ${{ inputs.task_id }}
         run: |
-          TASK_ID="$(python - <<'PY'
-          import json
-          print(json.load(open("task.json", encoding="utf-8"))["task_id"])
-          PY
-          )"
           python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" status "$TASK_ID" || true
           python -m orchestrator.cli --root "$ORCHESTRATOR_ROOT" report "$TASK_ID" || true
 
