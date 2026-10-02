@@ -62,7 +62,8 @@ def test_preflight_rejects_tick_mismatch(monkeypatch):
     assert result.rejection_code == "PF008_PRICE_TICK_MISMATCH"
 
 
-def test_preflight_rejects_stale_market():
+def test_preflight_rejects_stale_market(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     stale = market()
     stale.timestamp = time.time() - 120
     result = PreFlightValidator().validate(intent(), metadata(), account(), stale)
