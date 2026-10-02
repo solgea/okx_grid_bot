@@ -1,0 +1,14 @@
+services:
+  okx-grid-bot-g9:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: okx-grid-bot-g9
+    env_file:
+      - .env
+    environment:
+      IS_DEMO: "true"
+      DRY_RUN: "false"
+      G9_DEMO_CONFIRM: "true"
+    command: ["python", "scripts/g9_demo_order.py"]
+    restart: "no"
