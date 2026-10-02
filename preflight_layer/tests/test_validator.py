@@ -107,7 +107,8 @@ def test_valid_order_passes(monkeypatch, validator, valid_intent, valid_metadata
     assert result.passed == True
     assert validator.state == PreFlightState.AUTHORIZED
 
-def test_quantity_below_min_rejected(validator, valid_intent, valid_metadata):
+def test_quantity_below_min_rejected(monkeypatch, validator, valid_intent, valid_metadata):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     valid_intent.size = Decimal('0.005')
     
     account = AccountState(
