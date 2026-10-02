@@ -6,12 +6,7 @@ from orchestrator.agents.planner_agent import PlannerAgent
 from orchestrator.agents.engineering_agent import EngineeringAgent
 from orchestrator.agents.test_agent import TestAgent
 from orchestrator.agents.reviewer_agent import ReviewerAgent
-from orchestrator.execution.ci import TestExecutor
-from .service import RuntimeService
-
-class _Completed:
-    def __init__(self, result):
-        self.returncode, self.stdout, self.stderr = result.returncode, result.stdout, result.stderr
+from .runtime.service import RuntimeService
 
 def _service(root):
     policy = DefaultPolicyEngine()
