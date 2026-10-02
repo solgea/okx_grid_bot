@@ -235,3 +235,21 @@ async def test_order_manager_rejects_order_using_async_metadata_update(
 
     assert accepted is False
     assert validator.state == PreFlightState.REJECTED
+
+def test_account_leverage_must_be_positive(valid_intent, valid_metadata):
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("0"),
+    )
+    market = MarketData(
+        bid=Decimal("10.4"),
+        ask=Decimal("10.6"),
+        last=Decimal("10.5"),
+        timestamp=time.time(),
+    )
+
+    result = PreFlightValidator().validate(valid_intent, valid_metadata, account, market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF027_ACCOUNT_CONFIGURATION_INVALID"
