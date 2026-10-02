@@ -4,6 +4,7 @@ from preflight_layer.interfaces import IExchangeAdapter
 from preflight_layer.domain import InstrumentMetadata, AccountState, MarketData
 from engine.exchange import OKXEngine
 from adapters.market_stream import OKXMarketStream
+from config.settings import config
 
 logger = logging.getLogger("OKXPreFlightAdapter")
 
