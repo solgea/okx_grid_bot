@@ -10,7 +10,7 @@ from preflight_layer.domain import (
     PF006_INVALID_MIN_SIZE, PF007_INVALID_PRICE, PF008_PRICE_TICK_MISMATCH,
     PF009_INVALID_QUANTITY, PF010_QUANTITY_BELOW_MIN, PF011_QUANTITY_LOT_MISMATCH,
     PF015_INVALID_LEVERAGE, PF016_LEVERAGE_EXCEEDED, PF017_INSUFFICIENT_MARGIN,
-    PF018_MAX_SIZE_EXCEEDED, PF025_STALE_MARKET_DATA, PF026_MARKET_DATA_UNAVAILABLE,
+    PF018_MAX_SIZE_EXCEEDED, PF025_STALE_MARKET_DATA, PF026_MARKET_DATA_UNAVAILABLE, PF027_ACCOUNT_CONFIGURATION_INVALID,
 )
 
 
@@ -90,7 +90,10 @@ class PreFlightValidator:
         if intent.leverage <= 0:
             self.state = self._reject(result, PF015_INVALID_LEVERAGE, "Leverage must be positive.")
             return result
-        if account is None or account.available_margin <= 0:
+        if account is None or account.leverage <= 0:
+            self.state = self._reject(result, PF027_ACCOUNT_CONFIGURATION_INVALID, "Invalid account leverage configuration.")
+            return result
+        if account.available_margin <= 0:
             self.state = self._reject(result, PF017_INSUFFICIENT_MARGIN, "No available margin.")
             return result
         if intent.leverage > account.leverage:
