@@ -53,6 +53,8 @@ jobs:
       CI_RUN_ID: ${{ github.event.workflow_run.id || '' }}
       TASK_ID: ${{ github.event.inputs.task_id || 'CI-G8-AUTO' }}
       TASK_ISSUE: ${{ github.event.inputs.issue_number || '' }}
+      EVENT_NAME: ${{ github.event_name }}
+      TRIGGER_CI_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
 
     steps:
       - name: Checkout active PR branch
@@ -92,15 +94,53 @@ jobs:
             fi
           } > agent/runtime/CI_CONTEXT.md
 
+      - name: Compute blocker signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIG="none"
+          if [ "${TRIGGER_CI_CONCLUSION:-}" = "failure" ]; then
+            FIRST="$(grep -m1 -iE 'failed|error' agent/runtime/CI_FAILURE.log 2>/dev/null || true)"
+            # Normalize so the same failure hashes the same on every run:
+            # drop job/step/timestamp prefix, ANSI colors, and all digits.
+            FIRST="$(printf '%s' "$FIRST" | sed -E 's/\x1b\[[0-9;]*m//g; s/^.*[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //; s/[0-9]+/N/g' | cut -c1-160)"
+            SIG="ci:$(printf '%s' "${FIRST:-unknown}" | sha1sum | cut -c1-12)"
+          fi
+          echo "BLOCKER_SIG=$SIG" >> "$GITHUB_ENV"
+
+      - name: Enforce same-failure limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          read_key() { sed -n "s/^$1: *//p" agent/STATE.md 2>/dev/null | head -n1 | tr -d '\r' || true; }
+          PREV_SIG="$(read_key last_blocker)"
+          PREV_N="$(read_key same_failure_attempts)"
+          MAX_N="$(read_key max_same_failure_attempts)"
+          [[ "$PREV_N" =~ ^[0-9]+$ ]] || PREV_N=0
+          [[ "$MAX_N" =~ ^[0-9]+$ ]] || MAX_N=2
+          LIMIT=false
+          # Only the autonomous CI-triggered chain is limited; a human dispatch always runs.
+          if [ "${EVENT_NAME:-}" = "workflow_run" ] && [ "${BLOCKER_SIG:-none}" != "none" ] \
+             && [ "${BLOCKER_SIG}" = "$PREV_SIG" ] && [ "$PREV_N" -ge "$MAX_N" ]; then
+            LIMIT=true
+            echo "::warning::Same blocker (${BLOCKER_SIG}) already attempted ${PREV_N}/${MAX_N} times; agent will make no change."
+          fi
+          {
+            echo "PREV_SIG=$PREV_SIG"
+            echo "PREV_ATTEMPTS=$PREV_N"
+            echo "MAX_ATTEMPTS=$MAX_N"
+            echo "AGENT_LIMIT_REACHED=$LIMIT"
+          } >> "$GITHUB_ENV"
+
       - name: Install dependencies for validation
         run: python -m pip install -r requirements.txt
 
       - name: Install Groq coding agent
-        if: env.TASK_ID != 'EA-OKX-READONLY-001'
+        if: env.TASK_ID != 'EA-OKX-READONLY-001' && env.AGENT_LIMIT_REACHED != 'true'
         run: python -m pip install --disable-pip-version-check aider-chat
 
       - name: Build agent prompt
-        if: env.TASK_ID != 'EA-OKX-READONLY-001'
+        if: env.TASK_ID != 'EA-OKX-READONLY-001' && env.AGENT_LIMIT_REACHED != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -143,7 +183,7 @@ jobs:
 
       - name: Run Groq engineering agent
         id: agent
-        if: env.TASK_ID != 'EA-OKX-READONLY-001'
+        if: env.TASK_ID != 'EA-OKX-READONLY-001' && env.AGENT_LIMIT_REACHED != 'true'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         shell: bash
@@ -154,11 +194,13 @@ jobs:
 
       - name: Validate agent result
         id: validate
-        if: env.TASK_ID != 'EA-OKX-READONLY-001'
+        if: env.TASK_ID != 'EA-OKX-READONLY-001' && env.AGENT_LIMIT_REACHED != 'true'
         shell: bash
         run: |
           set -euo pipefail
           rm -f agent/runtime/CI_CONTEXT.md agent/runtime/CI_SUMMARY.json agent/runtime/CI_FAILURE.log agent/runtime/AGENT_PROMPT.md
+          # The agent must not rewrite its own failure counter or report.
+          git checkout -- agent/STATE.md agent/REPORT.md 2>/dev/null || true
           if git diff --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No repository change produced."
@@ -251,6 +293,24 @@ jobs:
               STATUS="BLOCKED"
             fi
           fi
+          SIG="${BLOCKER_SIG:-none}"
+          if [ "$TASK_ID" = "EA-OKX-READONLY-001" ]; then
+            if [ "$OKX_STATUS" = "PASS" ]; then SIG="none"; else SIG="readonly:${OKX_STATUS}"; fi
+          fi
+          LIMIT_REACHED="${AGENT_LIMIT_REACHED:-false}"
+          PREV_N="${PREV_ATTEMPTS:-0}"
+          MAX_N="${MAX_ATTEMPTS:-2}"
+          if [ "$SIG" = "none" ]; then
+            ATTEMPTS=0
+          elif [ "$SIG" = "${PREV_SIG:-}" ]; then
+            if [ "$LIMIT_REACHED" = "true" ]; then ATTEMPTS="$PREV_N"; else ATTEMPTS=$((PREV_N + 1)); fi
+          else
+            ATTEMPTS=1
+          fi
+          if [ "$LIMIT_REACHED" = "true" ]; then
+            STATUS="BLOCKED"
+            AGENT_MESSAGE="Stopped: the same blocker ($SIG) was already attempted $PREV_N/$MAX_N times. No change made; human review required."
+          fi
           CI_CONCLUSION="unknown"
           if [ -n "$CI_RUN_ID" ]; then
             CI_CONCLUSION="$(gh run view "$CI_RUN_ID" --json conclusion --jq .conclusion 2>/dev/null || echo unknown)"
@@ -267,10 +327,10 @@ jobs:
           head_branch: $HEAD_BRANCH
           last_ci_run: ${CI_RUN_ID:-N/A}
           last_ci_conclusion: $CI_CONCLUSION
-          last_blocker: $LAST_BLOCKER
+          last_blocker: $SIG
           readonly_runtime: $OKX_STATUS
-          same_failure_attempts: 0
-          max_same_failure_attempts: 2
+          same_failure_attempts: $ATTEMPTS
+          max_same_failure_attempts: $MAX_N
           live_trading_allowed: false
           auto_merge_allowed: false
 
@@ -291,6 +351,8 @@ jobs:
             echo "- Agent validation: $VALIDATION"
             echo "- OKX Demo read-only runtime: $OKX_STATUS"
             echo "- Runtime outcome: $RUNTIME_OUTCOME"
+            echo "- Blocker: $SIG"
+            echo "- Same-failure attempts: $ATTEMPTS/$MAX_N"
             echo "- Live trading: BLOCKED"
             echo "- Auto merge: BLOCKED"
             echo "- Order loop: NOT_STARTED for EA-OKX-READONLY-001"
