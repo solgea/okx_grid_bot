@@ -256,26 +256,26 @@ jobs:
             CI_CONCLUSION="$(gh run view "$CI_RUN_ID" --json conclusion --jq .conclusion 2>/dev/null || echo unknown)"
           fi
           cat > agent/STATE.md <<EOF
-# Engineering Agent State
+          # Engineering Agent State
 
-status: $STATUS
-phase: 3
-gate: G8
-task_id: $TASK_ID
-issue: ${TASK_ISSUE:-N/A}
-pr: $PR_NUMBER
-head_branch: $HEAD_BRANCH
-last_ci_run: ${CI_RUN_ID:-N/A}
-last_ci_conclusion: $CI_CONCLUSION
-last_blocker: $LAST_BLOCKER
-readonly_runtime: $OKX_STATUS
-same_failure_attempts: 0
-max_same_failure_attempts: 2
-live_trading_allowed: false
-auto_merge_allowed: false
+          status: $STATUS
+          phase: 3
+          gate: G8
+          task_id: $TASK_ID
+          issue: ${TASK_ISSUE:-N/A}
+          pr: $PR_NUMBER
+          head_branch: $HEAD_BRANCH
+          last_ci_run: ${CI_RUN_ID:-N/A}
+          last_ci_conclusion: $CI_CONCLUSION
+          last_blocker: $LAST_BLOCKER
+          readonly_runtime: $OKX_STATUS
+          same_failure_attempts: 0
+          max_same_failure_attempts: 2
+          live_trading_allowed: false
+          auto_merge_allowed: false
 
-CI and repository evidence take precedence over this state file.
-EOF
+          CI and repository evidence take precedence over this state file.
+          EOF
           {
             echo "# Engineering Agent Report"
             echo
