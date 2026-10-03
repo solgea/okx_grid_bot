@@ -1,0 +1,21 @@
+name: EA Dispatch Probe
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "Task ID"
+        required: true
+        type: string
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: string
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm dispatch
+        run: |
+          echo "WORKFLOW_DISPATCH=RECEIVED"
+          echo "TASK_ID=${{ inputs.task_id }}"
+          echo "ISSUE_NUMBER=${{ inputs.issue_number }}"
