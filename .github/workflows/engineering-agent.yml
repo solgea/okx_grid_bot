@@ -1,4 +1,5 @@
 name: OKX Engineering Agent
+# workflow-dispatch registration refresh: no functional change
 
 on:
   workflow_run:
