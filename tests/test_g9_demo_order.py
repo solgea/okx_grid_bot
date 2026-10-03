@@ -129,7 +129,7 @@ def test_cancel_failure_is_reported_as_failed():
     assert code == "FAILED" and "cancel boom" in final["error"]
 
 
-def _patch_main(monkeypatch, engine):
+def _patch_main(monkeypatch, engine, market_age_sec=0.0, market_last="60000"):
     from config.settings import config
     from preflight_layer.domain import AccountState, InstrumentMetadata, MarketData
     import time as _t
@@ -156,7 +156,8 @@ def _patch_main(monkeypatch, engine):
             return AccountState(balance=Decimal("10000"), available_margin=Decimal("10000"), leverage=Decimal("3"))
 
         async def fetch_market_data(self, symbol):
-            return MarketData(bid=Decimal("60000"), ask=Decimal("60000"), last=Decimal("60000"), timestamp=_t.time())
+            return MarketData(bid=Decimal("60000"), ask=Decimal("60000"), last=Decimal(market_last),
+                              timestamp=_t.time() - market_age_sec)
 
     monkeypatch.setattr(g9, "OKXEngine", lambda: engine)
     monkeypatch.setattr(g9, "OKXPreFlightAdapter", FakeAdapter)
@@ -191,3 +192,79 @@ def test_main_filled_reports_position_and_does_not_cancel(monkeypatch, capsys):
     evidence = json.loads(out.out.strip().splitlines()[-1])
     assert evidence["cleanup"] == "FILLED_POSITION_OPEN" and evidence["position_size"] == 0.01
     assert eng.cancelled == [] and "WARNING" in out.err
+
+
+# --- refusal paths: nothing may reach the exchange -----------------------------
+def _no_engine(monkeypatch):
+    """Fail the test if the exchange engine is even constructed."""
+    def boom():
+        raise AssertionError("OKXEngine must not be constructed on a refused G9 run")
+    monkeypatch.setattr(g9, "OKXEngine", boom)
+
+
+def _demo_env(monkeypatch, **overrides):
+    from config.settings import config
+    values = {"IS_DEMO": True, "DRY_RUN": False, "API_KEY": "k", "API_SECRET": "s",
+              "PASSPHRASE": "p", "KILL_SWITCH_ACTIVE": True}
+    values.update(overrides)
+    for name, value in values.items():
+        monkeypatch.setattr(config, name, value)
+    monkeypatch.setenv("G9_DEMO_CONFIRM", "true")
+    return config
+
+
+def test_g9_refuses_when_dry_run_is_true(monkeypatch):
+    config = _demo_env(monkeypatch, DRY_RUN=True)
+    _no_engine(monkeypatch)
+    with pytest.raises(RuntimeError, match="DRY_RUN"):
+        run(g9.main())
+    assert config.KILL_SWITCH_ACTIVE is True  # refusal must not touch the kill switch
+
+
+@pytest.mark.parametrize("missing", ["API_KEY", "API_SECRET", "PASSPHRASE"])
+def test_g9_refuses_when_a_credential_is_missing(monkeypatch, missing):
+    config = _demo_env(monkeypatch, **{missing: ""})
+    _no_engine(monkeypatch)
+    with pytest.raises(RuntimeError, match="credentials"):
+        run(g9.main())
+    assert config.KILL_SWITCH_ACTIVE is True
+
+
+def test_g9_refuses_when_confirm_is_not_exactly_true(monkeypatch):
+    config = _demo_env(monkeypatch)
+    monkeypatch.setenv("G9_DEMO_CONFIRM", "TRUE")  # only the literal "true" is accepted
+    _no_engine(monkeypatch)
+    with pytest.raises(RuntimeError, match="G9_DEMO_CONFIRM"):
+        run(g9.main())
+    assert config.KILL_SWITCH_ACTIVE is True
+
+
+def test_g9_preflight_rejection_places_no_order(monkeypatch):
+    eng = FakeEngine([{"status": "open", "filled": 0}])
+    _patch_main(monkeypatch, eng, market_age_sec=120)  # stale market data -> PF025
+    with pytest.raises(RuntimeError, match="preflight rejected: PF025_STALE_MARKET_DATA"):
+        run(g9.main())
+    assert eng.placed == [] and eng.cancelled == []
+    assert eng.exchange.fetch_calls == 0
+    assert eng.closed  # connection is still closed on rejection
+
+
+def test_g9_unavailable_market_price_places_no_order(monkeypatch):
+    eng = FakeEngine([{"status": "open", "filled": 0}])
+    _patch_main(monkeypatch, eng, market_last="0")
+    with pytest.raises(RuntimeError, match="market price unavailable"):
+        run(g9.main())
+    assert eng.placed == [] and eng.closed
+
+
+def test_g9_exchange_response_without_order_id_is_an_error(monkeypatch):
+    eng = FakeEngine([{"status": "open", "filled": 0}])
+
+    async def no_id(*a, **k):
+        return {"status": None}
+
+    eng.place_order = no_id
+    _patch_main(monkeypatch, eng)
+    with pytest.raises(RuntimeError, match="order id"):
+        run(g9.main())
+    assert eng.cancelled == [] and eng.closed
