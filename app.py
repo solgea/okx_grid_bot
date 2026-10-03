@@ -76,6 +76,20 @@ def create_server(
                     elif action == "close":
                         fill = paper.close_position(agent_id)
                         self._send_json(200, {"fill": fill})
+                    elif action == "update":
+                        agent = paper.update_agent(
+                            agent_id,
+                            name=payload.get("name"),
+                            contracts=payload.get("contracts"),
+                            leverage=payload.get("leverage"),
+                        )
+                        self._send_json(200, {"agent": agent})
+                    elif action == "delete":
+                        if payload.get("confirm") is not True:
+                            self._send_json(400, {"error": "Silme işlemi onay gerektirir."})
+                            return
+                        agent = paper.delete_agent(agent_id)
+                        self._send_json(200, {"agent": agent})
                     else:
                         self._send_json(404, {"error": "İşlem bulunamadı."})
                 elif path == "/api/orders":

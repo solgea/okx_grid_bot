@@ -106,11 +106,7 @@ class PaperTradingManager:
     def create_agent(
         self, name: str, contracts: int = 1, leverage: int = 2
     ) -> dict[str, Any]:
-        if not isinstance(name, str):
-            raise PaperTradingError("Ajan adı metin olmalı.")
-        clean_name = name.strip()
-        if not clean_name or len(clean_name) > 40:
-            raise PaperTradingError("Ajan adı 1-40 karakter arasında olmalı.")
+        clean_name = self._validate_name(name)
         self._validate_size(contracts)
         self._validate_leverage(leverage)
         with self._lock:
@@ -143,6 +139,50 @@ class PaperTradingManager:
             agent["active"] = active
             agent["halt_reason"] = None
             agent["signal"] = "İzleniyor" if active else "Durduruldu"
+            self._save_state()
+            return self._public_agent(agent)
+
+    def update_agent(
+        self,
+        agent_id: str,
+        name: str | None = None,
+        contracts: int | None = None,
+        leverage: int | None = None,
+    ) -> dict[str, Any]:
+        """Edit an agent. Size/leverage may only change while the agent is flat."""
+        if name is None and contracts is None and leverage is None:
+            raise PaperTradingError("Güncellenecek alan belirtilmedi.")
+        clean_name = self._validate_name(name) if name is not None else None
+        if contracts is not None:
+            self._validate_size(contracts)
+        if leverage is not None:
+            self._validate_leverage(leverage)
+        with self._lock:
+            agent = self._get_agent(agent_id)
+            changes_risk = (contracts is not None and contracts != agent["contracts"]) or (
+                leverage is not None and leverage != agent["leverage"]
+            )
+            if changes_risk and self._has_open_position(agent_id):
+                raise PaperTradingError(
+                    "Açık pozisyon varken kontrat veya kaldıraç değiştirilemez; önce pozisyonu kapatın."
+                )
+            if clean_name is not None:
+                agent["name"] = clean_name
+            if contracts is not None:
+                agent["contracts"] = contracts
+            if leverage is not None:
+                agent["leverage"] = leverage
+            self._save_state()
+            return self._public_agent(agent)
+
+    def delete_agent(self, agent_id: str) -> dict[str, Any]:
+        """Remove an agent. Refused while it still holds an open position."""
+        with self._lock:
+            agent = self._get_agent(agent_id)
+            if self._has_open_position(agent_id):
+                raise PaperTradingError("Açık pozisyonu olan ajan silinemez; önce pozisyonu kapatın.")
+            del self._agents[agent_id]
+            self._positions.pop(agent_id, None)
             self._save_state()
             return self._public_agent(agent)
 
@@ -372,6 +412,19 @@ class PaperTradingManager:
             self._market_updated_at is None
             or time.time() - self._market_updated_at > 15
         )
+
+    def _has_open_position(self, agent_id: str) -> bool:
+        position = self._positions.get(agent_id)
+        return bool(position and position["size"] != 0)
+
+    @staticmethod
+    def _validate_name(name: str) -> str:
+        if not isinstance(name, str):
+            raise PaperTradingError("Ajan adı metin olmalı.")
+        clean_name = name.strip()
+        if not clean_name or len(clean_name) > 40:
+            raise PaperTradingError("Ajan adı 1-40 karakter arasında olmalı.")
+        return clean_name
 
     def _get_agent(self, agent_id: str) -> dict[str, Any]:
         agent = self._agents.get(agent_id)
