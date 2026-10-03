@@ -243,7 +243,7 @@ jobs:
           fi
           docker build -t okx-grid-bot:ea-readonly .
           set +e
-          docker run --rm -e API_KEY -e API_SECRET -e PASSPHRASE -e IS_DEMO -e DRY_RUN -e SYMBOL okx-grid-bot:ea-readonly python scripts/okx_read_only_bootstrap.py 2>&1 | tee agent/runtime/OKX_READONLY_RUNTIME.log
+          docker run --rm -e API_KEY -e API_SECRET -e PASSPHRASE -e IS_DEMO -e DRY_RUN -e SYMBOL -e PYTHONPATH=/app okx-grid-bot:ea-readonly python scripts/okx_read_only_bootstrap.py 2>&1 | tee agent/runtime/OKX_READONLY_RUNTIME.log
           rc=${PIPESTATUS[0]}
           set -e
           if [ "$rc" -eq 0 ]; then
