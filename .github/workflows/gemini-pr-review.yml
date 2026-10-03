@@ -1,29 +1,7 @@
-name: Gemini PR Code Review
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  gemini-review:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: read
-
-    steps:
-      - name: Repoyu Klonla
-        uses: actions/checkout@v4
-
-      - name: Python Ortamını Kur
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Bağımlılıkları Yükle
+- name: Bağımlılıkları Yükle
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install google-generativeai
 
       - name: PR Diff Al ve Gemini İncelemesi Çalıştır
         env:
@@ -34,15 +12,17 @@ jobs:
           # PR kod farklarını (diff) al
           gh pr diff $PR_NUMBER > pr_diff.txt
 
-          # Gemini API entegrasyonu ve yorum paylaşımı
+          # Resmi SDK ile Gemini API entegrasyonu
           python -c "
           import os
-          import json
           import subprocess
-          import requests
+          import google.generativeai as genai
 
           api_key = os.getenv('GEMINI_API_KEY')
           pr_number = os.getenv('PR_NUMBER')
+
+          # Gemini API Yapılandırması
+          genai.configure(api_key=api_key)
 
           with open('pr_diff.txt', 'r', encoding='utf-8') as f:
               diff_text = f.read()
@@ -51,7 +31,6 @@ jobs:
               print('İncelenecek kod değişikliği bulunamadı.')
               exit(0)
 
-          # Çok büyük PR'lar için karakter sınırı (gerekirse kırpma)
           if len(diff_text) > 30000:
               diff_text = diff_text[:30000] + '\n\n...[Diff çok uzun olduğu için kalan kısım kırpıldı]'
 
@@ -63,23 +42,15 @@ jobs:
           3. 💡 **İyileştirme Önerileri**: Clean code, okunabilirlik ve refactoring tavsiyeleri.
 
           **PR Diff:**
-          \`\`\`diff
-          {diff_text}
-          \`\`\`'''
-
-          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}'
-          headers = {'Content-Type': 'application/json'}
-          payload = {
-              'contents': [{'parts': [{'text': prompt}]}]
-          }
-
-          response = requests.post(url, headers=headers, json=payload)
-          data = response.json()
+          {diff_text}'''
 
           try:
-              ai_review = data['candidates'][0]['content']['parts'][0]['text']
+              # Model tanımlaması ve içerik üretimi
+              model = genai.GenerativeModel('gemini-1.5-flash')
+              response = model.generate_content(prompt)
+              ai_review = response.text
           except Exception as e:
-              ai_review = f'Gemini yanıtı işlenirken hata oluştu: {str(e)}\n\nHata Detayı: {json.dumps(data)}'
+              ai_review = f'Gemini yanıtı işlenirken hata oluştu: {str(e)}'
 
           comment_body = f'### 🤖 Gemini PR Kod İncelemesi\n\n' + ai_review
 
