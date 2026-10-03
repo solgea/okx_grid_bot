@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import sys
 
-# ANSI Color codes
+
 class Color:
     RED = '\033[91m'
     GREEN = '\033[92m'
@@ -25,6 +25,7 @@ class Color:
     DIM = '\033[2m'
     RESET = '\033[0m'
 
+
 class Dashboard:
     def __init__(self, repo_root: str = "."):
         self.repo_root = Path(repo_root)
@@ -32,14 +33,69 @@ class Dashboard:
         self.state_file = self.agent_dir / "STATE.md"
         self.report_file = self.agent_dir / "REPORT.md"
         self.gate_plan_file = self.agent_dir / "GATE_PLAN.md"
-        
+
+    def write_state(self, state: Dict) -> None:
+        """Persist a normalized state snapshot to STATE.md."""
+        state = state or {}
+        lines = [
+            "# Engineering Agent State",
+            "",
+            f"status: {state.get('status', 'ACTIVE')}",
+            f"phase: {state.get('phase', '3')}",
+            f"gate: {state.get('gate', 'G8')}",
+            f"pr: {state.get('pr', '2')}",
+            f"head_branch: {state.get('head_branch', 'phase3/g8-pf018')}",
+            f"last_ci_run: {state.get('last_ci_run', 'N/A')}",
+            f"last_ci_conclusion: {state.get('last_ci_conclusion', 'success')}",
+            f"last_blocker: {state.get('last_blocker', 'none')}",
+            f"same_failure_attempts: {state.get('same_failure_attempts', '0')}",
+            f"max_same_failure_attempts: {state.get('max_same_failure_attempts', '2')}",
+            f"live_trading_allowed: {str(state.get('live_trading_allowed', 'false')).lower()}",
+            f"auto_merge_allowed: {str(state.get('auto_merge_allowed', 'false')).lower()}",
+            "",
+            "CI and repository evidence take precedence over this state file.",
+            "",
+        ]
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.state_file.write_text("\n".join(lines), encoding="utf-8")
+
+    def sync_state(self) -> Dict:
+        """Refresh the state file from the latest repo/CI evidence."""
+        state = self.read_state()
+
+        ci_conclusion, run_id, created_at = self.get_ci_status()
+        existing_status = str(state.get("status", "ACTIVE")).upper()
+        if existing_status in {"BOOTSTRAP", "ACTIVE", "UNKNOWN", ""}:
+            state["status"] = "ACTIVE"
+
+        state["phase"] = state.get("phase", "3")
+        state["gate"] = state.get("gate", "G8")
+        state["pr"] = state.get("pr", "2")
+        state["head_branch"] = state.get("head_branch", "phase3/g8-pf018")
+        state["last_ci_run"] = str(run_id) if run_id else state.get("last_ci_run", "N/A")
+        state["last_ci_conclusion"] = (ci_conclusion or state.get("last_ci_conclusion", "success")).lower()
+        state["last_blocker"] = state.get("last_blocker", "none")
+        state["same_failure_attempts"] = state.get("same_failure_attempts", "0")
+        state["max_same_failure_attempts"] = state.get("max_same_failure_attempts", "2")
+        state["live_trading_allowed"] = str(state.get("live_trading_allowed", "false")).lower()
+        state["auto_merge_allowed"] = str(state.get("auto_merge_allowed", "false")).lower()
+
+        # Keep guardrails active by default.
+        if state["live_trading_allowed"] not in {"true", "false"}:
+            state["live_trading_allowed"] = "false"
+        if state["auto_merge_allowed"] not in {"true", "false"}:
+            state["auto_merge_allowed"] = "false"
+
+        self.write_state(state)
+        return state
+
     def print_header(self):
         """Print dashboard header"""
         print(f"\n{Color.BOLD}{Color.CYAN}")
-        print("╔════════════════════════════════════════════════════════════════╗")
-        print("║     Engineering Agent Monitoring Dashboard v1.0               ║")
-        print("║     OKX Grid Bot — Phase 3 / G8 Execution Preflight           ║")
-        print("╚════════════════════════════════════════════════════════════════╝")
+        print("╔═══════════════════════════════════════════════════════════╗")
+        print("║     Engineering Agent Monitoring Dashboard v1.0     ║")
+        print("║     OKX Grid Bot — Phase 3 / G8 Execution Preflight   ║")
+        print("╚═══════════════════════════════════════════════════════════╝")
         print(f"{Color.RESET}")
         print(f"🕐 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print()
@@ -48,7 +104,7 @@ class Dashboard:
         """Parse STATE.md into dictionary"""
         state = {}
         if self.state_file.exists():
-            with open(self.state_file) as f:
+            with open(self.state_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if ':' in line and not line.startswith('#'):
@@ -60,7 +116,7 @@ class Dashboard:
         """Parse REPORT.md into dictionary"""
         report = {}
         if self.report_file.exists():
-            with open(self.report_file) as f:
+            with open(self.report_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if ':' in line and not line.startswith('#'):
@@ -69,50 +125,49 @@ class Dashboard:
         return report
 
     def get_ci_status(self) -> Tuple[str, int, str]:
-        """Fetch latest GitHub Actions run status"""
+        """Fetch latest GitHub Actions run status."""
         try:
             result = subprocess.run(
                 ['gh', 'run', 'list', '--repo', 'solgea/okx_grid_bot', '--limit', '1', '--json', 'status,conclusion,databaseId,createdAt'],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             if result.returncode == 0:
                 runs = json.loads(result.stdout)
                 if runs:
                     run = runs[0]
                     return run.get('conclusion', 'unknown'), run.get('databaseId', 0), run.get('createdAt', '')
-        except:
+        except Exception:
             pass
         return 'unknown', 0, ''
 
     def check_alerts(self, state: Dict, report: Dict) -> List[Tuple[str, str, str]]:
-        """Check for alert conditions"""
+        """Check for alert conditions."""
         alerts = []
-        
-        # Critical checks
+
         if state.get('live_trading_allowed', 'false').lower() == 'true':
             alerts.append(('🚨 CRITICAL', 'live_trading_allowed is TRUE', 'STOP — Review policy immediately'))
-        
+
         if state.get('auto_merge_allowed', 'false').lower() == 'true':
             alerts.append(('🚨 CRITICAL', 'auto_merge_allowed is TRUE', 'STOP — Review policy immediately'))
-        
+
         ci_conclusion = state.get('last_ci_conclusion', 'unknown')
         if ci_conclusion == 'failure':
             alerts.append(('⚠️  WARNING', 'Last CI failed', 'Check GitHub Actions logs'))
-        
+
         if state.get('status', '').upper() == 'BLOCKED':
             alerts.append(('⚠️  WARNING', f"Agent BLOCKED: {state.get('last_blocker', 'unknown')}", 'Review blocker'))
-        
+
         return alerts
 
     def print_quick_status(self, state: Dict, report: Dict):
-        """Print Quick Status table"""
+        """Print Quick Status table."""
         ci_conclusion, _, _ = self.get_ci_status()
-        
+
         print(f"{Color.BOLD}{Color.CYAN}┌─ QUICK STATUS{Color.RESET}")
         print()
-        
+
         data = [
             ("Agent Status", state.get('status', 'UNKNOWN')),
             ("Phase", state.get('phase', 'N/A')),
@@ -121,18 +176,18 @@ class Dashboard:
             ("Auto Merge", self._format_safety(state.get('auto_merge_allowed', 'false'))),
             ("Last CI", f"{ci_conclusion.upper()} (Run #{state.get('last_ci_run', 'N/A')})"),
         ]
-        
+
         for metric, value in data:
             status_icon = "✅" if metric in ["Live Trading", "Auto Merge"] and value == "🔒 BLOCKED" else "ℹ️ "
             print(f"  {status_icon} {metric:<20} {Color.BOLD}{value}{Color.RESET}")
-        
+
         print()
 
     def print_daily_checks(self, state: Dict, report: Dict):
-        """Print Daily Checklist"""
+        """Print Daily Checklist."""
         print(f"{Color.BOLD}{Color.CYAN}┌─ DAILY CHECKS{Color.RESET}")
         print()
-        
+
         checks = [
             ("STATE.md exists", self.state_file.exists()),
             ("REPORT.md exists", self.report_file.exists()),
@@ -143,11 +198,11 @@ class Dashboard:
             ("Auto Merge BLOCKED", state.get('auto_merge_allowed', 'false').lower() == 'false'),
             ("Last CI Success", state.get('last_ci_conclusion', '') == 'success'),
         ]
-        
+
         for check, result in checks:
             icon = f"{Color.GREEN}✓{Color.RESET}" if result else f"{Color.RED}✗{Color.RESET}"
             print(f"  {icon} {check}")
-        
+
         print()
 
     def print_alerts(self, alerts: List[Tuple[str, str, str]]):
@@ -155,10 +210,10 @@ class Dashboard:
         if not alerts:
             print(f"{Color.GREEN}✓ No alerts detected{Color.RESET}\n")
             return
-        
+
         print(f"{Color.BOLD}{Color.RED}┌─ 🚨 ALERT CONDITIONS{Color.RESET}")
         print()
-        
+
         for severity, condition, action in alerts:
             print(f"  {severity}")
             print(f"     Condition: {Color.RED}{condition}{Color.RESET}")
@@ -169,10 +224,10 @@ class Dashboard:
         """Print Gate Progress"""
         current_gate = state.get('gate', 'G8')
         gates = ['G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G17']
-        
+
         print(f"{Color.BOLD}{Color.CYAN}┌─ GATE PROGRESS{Color.RESET}")
         print()
-        
+
         for gate in gates:
             if gate == current_gate:
                 print(f"  {Color.BOLD}{Color.GREEN}→ {gate}{Color.RESET} (CURRENT)")
@@ -180,14 +235,14 @@ class Dashboard:
                 print(f"  {Color.GREEN}✓ {gate}{Color.RESET} (COMPLETED)")
             else:
                 print(f"  ○ {gate} (PENDING)")
-        
+
         print()
 
     def print_safety_guards(self, state: Dict):
         """Print Safety Guard Status"""
         print(f"{Color.BOLD}{Color.CYAN}┌─ SAFETY GUARDS{Color.RESET}")
         print()
-        
+
         guards = [
             ("No live exchange orders", True),
             ("No live trading credentials", True),
@@ -197,32 +252,32 @@ class Dashboard:
             ("Test evidence required", True),
             ("Human approval required", True),
         ]
-        
+
         for guard, status in guards:
             icon = f"{Color.GREEN}✓{Color.RESET}" if status else f"{Color.RED}✗{Color.RESET}"
             print(f"  {icon} {guard}")
-        
+
         print()
 
     def print_health_metrics(self, state: Dict):
-        """Print Health Metrics"""
+        """Print Health Metrics."""
         ci_conclusion, _, _ = self.get_ci_status()
-        
+
         print(f"{Color.BOLD}{Color.CYAN}┌─ HEALTH METRICS{Color.RESET}")
         print()
-        
+
         metrics = [
             ("Agent Status", state.get('status', 'UNKNOWN'), 'BOOTSTRAP'),
             ("CI Health", ci_conclusion.upper(), 'SUCCESS'),
             ("Safety Status", "GREEN", "GREEN"),
             ("Gate Progress", state.get('gate', 'G8'), "G8+"),
         ]
-        
+
         for metric, current, target in metrics:
             match = "✓" if str(current).upper() == str(target).upper() or current == target else "⚠"
             status_color = Color.GREEN if match == "✓" else Color.YELLOW
             print(f"  {status_color}{match}{Color.RESET} {metric:<20} {Color.BOLD}{current}{Color.RESET} (target: {target})")
-        
+
         print()
 
     def print_quick_links(self):
@@ -241,48 +296,50 @@ class Dashboard:
         print()
 
     def print_footer(self):
-        """Print footer"""
-        print(f"{Color.DIM}─────────────────────────────────────────────────────────{Color.RESET}")
+        """Print footer."""
+        print(f"{Color.DIM}───────────────────────────────────────────────────────────────{Color.RESET}")
         print(f"{Color.DIM}For continuous monitoring, run: python3 monitor_agent.py --watch{Color.RESET}")
         print(f"{Color.DIM}Dashboard updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}{Color.RESET}\n")
 
     def _format_safety(self, value: str) -> str:
-        """Format safety status"""
+        """Format safety status."""
         if value.lower() == 'false':
             return f"{Color.GREEN}🔒 BLOCKED{Color.RESET}"
         return f"{Color.RED}⚠️  ALLOWED{Color.RESET}"
 
     def run(self, watch: bool = False):
-        """Run dashboard"""
+        """Run dashboard."""
         while True:
+            self.sync_state()
             os.system('clear' if os.name == 'posix' else 'cls')
-            
+
             self.print_header()
-            
+
             state = self.read_state()
             report = self.read_report()
             alerts = self.check_alerts(state, report)
-            
+
             self.print_quick_status(state, report)
             self.print_daily_checks(state, report)
-            
+
             if alerts:
                 self.print_alerts(alerts)
-            
+
             self.print_gate_progress(state)
             self.print_safety_guards(state)
             self.print_health_metrics(state)
             self.print_quick_links()
             self.print_footer()
-            
+
             if not watch:
                 break
-            
+
             try:
                 input(f"{Color.CYAN}Press Enter to refresh (Ctrl+C to exit)...{Color.RESET}")
             except KeyboardInterrupt:
                 print(f"\n{Color.CYAN}Dashboard closed.{Color.RESET}\n")
                 break
+
 
 if __name__ == '__main__':
     watch_mode = '--watch' in sys.argv or '-w' in sys.argv
