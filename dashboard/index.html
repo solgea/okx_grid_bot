@@ -30,6 +30,7 @@
     .wide{grid-column:1/-1}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;font-size:11px}th{color:var(--muted);font-weight:500}td{color:#d6dae4}
     .notice-error{border-color:#6a3440;background:#26171b;color:#ffc0c7}.loading{color:var(--muted);padding:25px;text-align:center}.toast{position:fixed;right:22px;bottom:22px;max-width:360px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#222734;box-shadow:0 12px 35px #0007;display:none;font-size:12px}
     .demo-banner{border-color:#48538b;background:#1a2034;color:#c7d0ff}.demo-card{border-color:#3b456e}.demo-error{border:1px solid #6a3440;background:#26171b;color:#ffc0c7;padding:11px;border-radius:9px;font-size:11px}.demo-summary{display:flex;flex-wrap:wrap;gap:10px 22px;color:var(--muted);font-size:11px}.demo-summary b{color:var(--text)}.pill{padding:4px 8px;border-radius:20px;background:#262d40;color:#bfcaff;font-size:10px}
+    .danger{border:1px solid #6a3440;background:transparent;color:#ffa5ad}dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);padding:20px;width:min(380px,92vw)}dialog::backdrop{background:#000a}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
     @media(max-width:850px){.shell{padding:22px 16px 36px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
     @media(max-width:480px){.topbar{align-items:flex-start;gap:12px;flex-direction:column}.metrics{gap:9px}.card{padding:14px}.metric{font-size:21px}.chart-wrap{height:150px}}
   </style>
@@ -109,6 +110,15 @@
     </section>
     <p class="hint">Demo emirleri gerçek para kullanmasa da OKX Demo hesabında gerçekleşir; emir vermeden önce her zaman hesap ve pozisyon bilgilerini doğrulayın. Otomatik ajan yalnızca paper ortamında çalışır ve yatırım tavsiyesi değildir.</p>
   </main>
+  <dialog id="edit-dialog">
+    <form id="edit-form" class="agent-form" method="dialog">
+      <div class="section-head"><h2>Ajanı düzenle</h2></div>
+      <label>Ajan adı<input id="edit-name" maxlength="40" required></label>
+      <div class="field-row"><label>Kontrat<input id="edit-size" type="number" min="1" max="100" required></label><label>Kaldıraç<input id="edit-leverage" type="number" min="1" max="5" required></label></div>
+      <p id="edit-hint" class="hint">Açık pozisyon varken kontrat ve kaldıraç değiştirilemez; yalnızca ad güncellenir.</p>
+      <div class="dialog-actions"><button type="button" id="edit-cancel" class="button small secondary">Vazgeç</button><button type="submit" class="button small">Kaydet</button></div>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
   <script>
     const $ = (id) => document.getElementById(id);
@@ -156,7 +166,9 @@
         <span class="status ${agent.active ? "active" : agent.halt_reason ? "warning" : ""}">${agent.active ? "Çalışıyor" : agent.halt_reason ? "Risk durdurdu" : "Durduruldu"}</span></div>
         <div class="agent-meta">${escapeHtml(agent.halt_reason || agent.signal)}</div>
         <div class="agent-controls"><button class="button small ${agent.active ? "secondary" : ""}" data-action="${agent.active ? "stop" : "start"}" data-agent="${agent.id}">${agent.active ? "Durdur" : "Başlat"}</button>
-        <button class="button small secondary" data-action="close" data-agent="${agent.id}">Pozisyonu kapat</button></div></div>`).join("") : '<div class="empty">Henüz ajan yok. İlk ajanınızı oluşturun.</div>';
+        <button class="button small secondary" data-action="close" data-agent="${agent.id}">Pozisyonu kapat</button>
+        <button class="button small secondary" data-edit="${agent.id}">Düzenle</button>
+        <button class="button small danger" data-delete="${agent.id}">Sil</button></div></div>`).join("") : '<div class="empty">Henüz ajan yok. İlk ajanınızı oluşturun.</div>';
       $("trade-agent").innerHTML = items.length ? items.map((agent) => `<option value="${agent.id}">${escapeHtml(agent.name)} (${agent.leverage}×)</option>`).join("") : '<option value="">Önce ajan oluşturun</option>';
       document.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", async () => {
         try {
@@ -164,7 +176,29 @@
           await refresh();
         } catch (error) { showToast(error.message, true); }
       }));
+      document.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => openEditDialog(button.dataset.edit)));
+      document.querySelectorAll("[data-delete]").forEach((button) => button.addEventListener("click", () => deleteAgent(button.dataset.delete)));
       $("buy-btn").disabled = $("sell-btn").disabled = items.length === 0;
+    }
+    let editingAgentId = null;
+    function openEditDialog(agentId) {
+      const agent = agents.find((item) => item.id === agentId);
+      if (!agent) return;
+      editingAgentId = agentId;
+      $("edit-name").value = agent.name;
+      $("edit-size").value = agent.contracts;
+      $("edit-leverage").value = agent.leverage;
+      $("edit-dialog").showModal();
+    }
+    async function deleteAgent(agentId) {
+      const agent = agents.find((item) => item.id === agentId);
+      if (!agent) return;
+      if (!window.confirm(`"${agent.name}" ajanı silinsin mi?\n\nAçık pozisyonu varsa önce kapatmanız gerekir. İşlem geçmişi ve hesap bakiyesi korunur.`)) return;
+      try {
+        await request(`/api/agents/${agentId}/delete`, {confirm:true});
+        showToast("Ajan silindi.");
+        await refresh();
+      } catch (error) { showToast(error.message, true); }
     }
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
@@ -232,6 +266,16 @@
         await request("/api/agents", {name:$("agent-name").value, contracts:Number($("agent-size").value), leverage:Number($("agent-leverage").value)});
         showToast("Paper trading ajanı oluşturuldu.");
         $("agent-name").value = "Trend ajanı";
+        await refresh();
+      } catch (error) { showToast(error.message, true); }
+    });
+    $("edit-cancel").addEventListener("click", () => $("edit-dialog").close());
+    $("edit-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await request(`/api/agents/${editingAgentId}/update`, {name:$("edit-name").value, contracts:Number($("edit-size").value), leverage:Number($("edit-leverage").value)});
+        $("edit-dialog").close();
+        showToast("Ajan güncellendi.");
         await refresh();
       } catch (error) { showToast(error.message, true); }
     });
