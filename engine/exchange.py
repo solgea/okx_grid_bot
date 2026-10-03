@@ -30,33 +30,58 @@ class OKXEngine:
             logger.warning("OKX MAINNET mode enabled.")
 
     async def initialize(self):
+        """Initialize the exchange using read-only operations only.
+
+        Startup must never mutate exchange/account state. Leverage, margin
+        mode, position mode, orders and cancellations are runtime concerns.
+        """
         try:
-            logger.info("Loading OKX markets...")
-            await self.exchange.load_markets()
-            if config.SYMBOL not in self.exchange.markets:
-                raise ValueError(f"Unknown OKX symbol: {config.SYMBOL}")
-            self.connected = True
-            self.connection_generation += 1
-
-            # OKX/CCXT handle margin mode and leverage as separate operations.
-            try:
-                await self.exchange.set_margin_mode(config.MARGIN_MODE, config.SYMBOL)
-            except Exception as exc:
-                logger.warning("Margin mode could not be changed: %s", exc)
-
-            try:
-                await self.exchange.set_leverage(int(config.LEVERAGE), config.SYMBOL)
-            except Exception as exc:
-                logger.warning("Leverage could not be changed: %s", exc)
-
-            logger.info(
-                "OKX initialized: symbol=%s margin=%s leverage=%sx demo=%s",
-                config.SYMBOL, config.MARGIN_MODE, config.LEVERAGE, config.IS_DEMO,
-            )
+            await self.read_only_bootstrap()
         except Exception:
             self.connected = False
-            logger.exception("OKX initialization failed")
+            logger.exception("OKX read-only initialization failed")
             raise
+
+    async def read_only_bootstrap(self):
+        """Verify Demo connectivity and authenticated account visibility.
+
+        Only public/read-only API calls are permitted here:
+        load_markets, fetch_ticker, fetch_balance, fetch_positions and
+        fetch_open_orders. No trade or account-setting mutation is allowed.
+        """
+        if not config.IS_DEMO:
+            raise RuntimeError(
+                "Read-only bootstrap requires IS_DEMO=true; refusing non-Demo startup"
+            )
+
+        logger.info(
+            "Starting OKX Demo read-only bootstrap | symbol=%s", config.SYMBOL
+        )
+
+        await self.exchange.load_markets()
+        if config.SYMBOL not in self.exchange.markets:
+            raise ValueError(f"Unknown OKX symbol: {config.SYMBOL}")
+
+        ticker = await self.exchange.fetch_ticker(config.SYMBOL)
+        if not ticker or ticker.get("last") is None:
+            raise RuntimeError(f"OKX ticker unavailable for {config.SYMBOL}")
+
+        # Private read-only calls verify API credentials without requiring
+        # Trade permission.
+        balance = await self.exchange.fetch_balance()
+        await self.exchange.fetch_positions([config.SYMBOL])
+        open_orders = await self.exchange.fetch_open_orders(config.SYMBOL)
+
+        self.connected = True
+        self.connection_generation += 1
+
+        logger.info(
+            "OKX Demo read-only bootstrap PASS | symbol=%s | open_orders=%d | "
+            "balance_visible=%s | position_snapshot=read",
+            config.SYMBOL,
+            len(open_orders),
+            bool(balance),
+        )
 
     async def reconnect(self):
         async with self._connection_lock:
