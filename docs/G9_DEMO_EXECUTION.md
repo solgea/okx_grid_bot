@@ -10,6 +10,7 @@ This is an isolated, one-shot OKX Demo execution path.
 - The dedicated G9 compose service is separate from the normal bot.
 - The normal `docker-compose.yml` keeps `DRY_RUN=true`.
 - G9 submits exactly one limit order and has no retry loop.
+- After submission G9 reads the real order state with `fetch_order` and cancels the order if it is still working. Cancellation is not an order submission; G9 never submits a second order and never auto-closes a position.
 - No mainnet, withdrawal, account mutation, or grid/batch submission is supported.
 
 ## Configure
@@ -46,8 +47,13 @@ Expected successful output is a single JSON evidence line containing:
 - mode
 - symbol
 - preflight
-- exchange order id
-- exchange status
+- order_id
+- submit_status (status in the submit response, often empty)
+- status (verified with `fetch_order`)
+- filled, position_size
+- cleanup
 - timestamp
+
+`cleanup` values: `CANCELED` (cancel confirmed), `NOT_NEEDED` (already canceled/expired/rejected), `FILLED_POSITION_OPEN` (order filled; close the Demo position manually, a warning is printed to stderr), `FAILED` (order may still be open; the run exits non-zero and the order must be canceled manually in the OKX Demo UI).
 
 A successful G9 run must contain a real OKX Demo `order_id`. CI/test success alone is not G9 PASS.
