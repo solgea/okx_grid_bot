@@ -64,6 +64,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Inject current Agent validation harness
+        if: env.TASK_ID == 'EA-OKX-READONLY-001'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The target PR may predate the task harness. Keep the target code at the
+          # exact PR SHA while sourcing only the validator from current main.
+          mkdir -p scripts
+          git show origin/main:scripts/okx_read_only_bootstrap.py > scripts/okx_read_only_bootstrap.py
+          test -s scripts/okx_read_only_bootstrap.py
+
       - name: Build task and CI context
         shell: bash
         run: |
