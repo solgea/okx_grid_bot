@@ -2,124 +2,168 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10131b">
-  <title>OKX Agent Desk · Paper Trading</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Agent Desk · OKX paper ve Demo işlem paneli</title>
   <style>
-    :root{color-scheme:dark;--bg:#10131b;--panel:#171b26;--line:#292f3e;--muted:#8d96a9;--text:#f2f4f8;--green:#4cdda2;--red:#ff7385;--blue:#879cff;--amber:#f4c46d}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-    .shell{max-width:1440px;margin:auto;padding:30px 36px 50px}.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
-    .brand{display:flex;align-items:center;gap:13px}.brand-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#29345c;color:#a8b5ff;font-size:20px}
-    h1{font-size:20px;margin:0;letter-spacing:-.4px}.subtle,.eyebrow{color:var(--muted)}.subtle{font-size:12px;margin-top:2px}
-    .live-tag,.paper-tag{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:20px;padding:7px 11px;font-size:11px;color:#cbd1de}
-    .dot{width:7px;height:7px;border-radius:100%;background:var(--amber)}.dot.ok{background:var(--green);box-shadow:0 0 9px #4cdda277}.dot.bad{background:var(--red)}
-    .notice{display:flex;gap:11px;align-items:center;border:1px solid #634d2d;background:#211c15;color:#f2d69d;padding:12px 16px;border-radius:12px;margin-bottom:19px;font-size:12px}
-    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px}
-    .eyebrow{text-transform:uppercase;font-size:10px;letter-spacing:1px;font-weight:650}.metric{font-size:25px;font-weight:650;letter-spacing:-.8px;margin-top:12px}.metric-foot{font-size:11px;color:var(--muted);margin-top:4px}
-    .positive{color:var(--green)}.negative{color:var(--red)}.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,.9fr);gap:15px;margin-bottom:15px}
-    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}.section-head h2{font-size:14px;margin:0;font-weight:600}
-    .market-price{font-size:26px;font-weight:650;letter-spacing:-.7px}.market-label{color:var(--muted);font-size:11px}.chart-wrap{height:190px;margin:12px -2px 0}.chart-wrap svg{width:100%;height:100%;overflow:visible}
-    .trade-form,.agent-form{display:grid;gap:11px}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{display:grid;gap:6px;color:var(--muted);font-size:11px}
-    input,select{width:100%;border:1px solid var(--line);border-radius:9px;background:#11151e;padding:10px 11px;color:var(--text);font:inherit;outline:none}input:focus,select:focus{border-color:#7489ff}
-    .button-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.button{border:0;border-radius:9px;padding:10px 12px;background:#30385a;color:white;font:600 12px inherit;cursor:pointer}.button:hover{filter:brightness(1.15)}.button:disabled{opacity:.42;cursor:not-allowed}
-    .buy{background:#164634;color:#79efba}.sell{background:#522933;color:#ffa5ad}.secondary{border:1px solid var(--line);background:transparent;color:#c9d0dd}.small{font-size:11px;padding:7px 9px}
-    .hint{color:var(--muted);font-size:10px;margin:0}.agents,.fills{display:grid;gap:10px}
-    .agent{border:1px solid var(--line);background:#131721;border-radius:11px;padding:13px}.agent-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.agent-name{font-size:12px;font-weight:600}.agent-meta{color:var(--muted);font-size:10px;margin-top:4px}
-    .status{font-size:10px;border-radius:20px;padding:4px 8px;background:#252a37;color:#b7bfce}.status.active{background:#18382d;color:#76e1ac}.status.warning{background:#3b2d1d;color:#f4c46d}
-    .agent-controls{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}.empty{padding:26px 10px;text-align:center;color:var(--muted);font-size:11px;border:1px dashed var(--line);border-radius:10px}
-    .wide{grid-column:1/-1}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;font-size:11px}th{color:var(--muted);font-weight:500}td{color:#d6dae4}
-    .notice-error{border-color:#6a3440;background:#26171b;color:#ffc0c7}.loading{color:var(--muted);padding:25px;text-align:center}.toast{position:fixed;right:22px;bottom:22px;max-width:360px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#222734;box-shadow:0 12px 35px #0007;display:none;font-size:12px}
-    .demo-banner{border-color:#48538b;background:#1a2034;color:#c7d0ff}.demo-card{border-color:#3b456e}.demo-error{border:1px solid #6a3440;background:#26171b;color:#ffc0c7;padding:11px;border-radius:9px;font-size:11px}.demo-summary{display:flex;flex-wrap:wrap;gap:10px 22px;color:var(--muted);font-size:11px}.demo-summary b{color:var(--text)}.pill{padding:4px 8px;border-radius:20px;background:#262d40;color:#bfcaff;font-size:10px}
-    .danger{border:1px solid #6a3440;background:transparent;color:#ffa5ad}dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);padding:20px;width:min(380px,92vw)}dialog::backdrop{background:#000a}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
-    @media(max-width:850px){.shell{padding:22px 16px 36px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
-    @media(max-width:480px){.topbar{align-items:flex-start;gap:12px;flex-direction:column}.metrics{gap:9px}.card{padding:14px}.metric{font-size:21px}.chart-wrap{height:150px}}
+    :root{color-scheme:dark;--bg:#0f1624;--s1:#151f33;--s2:#1b2740;--line:#273553;--text:#e9eef8;--muted:#93a1bb;--accent:#7b93ff;--accent-ink:#0c1530;--pos:#3ccf9f;--neg:#ff6f84;--warn:#f2b957;--r:10px;
+      --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
+    *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 var(--font);font-variant-numeric:tabular-nums}
+    h1,h2,h3,p{margin:0}b,strong{font-weight:600}
+    .shell{max-width:1360px;margin:0 auto;padding:22px clamp(14px,3vw,36px) 48px}
+    :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:18px}
+    .brand h1{font-size:19px;font-weight:650;letter-spacing:-.2px}.brand p{color:var(--muted);font-size:12.5px;margin-top:1px}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--s1);border-radius:999px;padding:6px 12px;font-size:12px;color:#cdd6e8}
+    .chip.demo{border-color:#6b5628;color:var(--warn)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--warn)}.dot.ok{background:var(--pos);box-shadow:0 0 0 3px #3ccf9f2b}.dot.bad{background:var(--neg);box-shadow:0 0 0 3px #ff6f842b}
+    .notice{border:1px solid var(--line);border-left:3px solid var(--warn);background:var(--s1);border-radius:var(--r);padding:11px 15px;margin-bottom:18px;font-size:12.5px;color:#d8dff0}
+    .panel{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+    .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+    .panel-head h2{font-size:15px;font-weight:620}.market-label{color:var(--muted);font-size:12px}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:18px;padding:0}
+    .stat{padding:18px 22px;border-left:1px solid var(--line)}.stat:first-child{border-left:0}
+    .stat-label{color:var(--muted);font-size:12.5px}.metric{font-size:27px;font-weight:620;letter-spacing:-.6px;margin:5px 0 2px;line-height:1.2}.metric-foot{color:var(--muted);font-size:12px}
+    .positive{color:var(--pos)}.negative{color:var(--neg)}
+    .workspace{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr);gap:18px;align-items:start;margin-bottom:18px}
+    .stack{display:grid;gap:18px}
+    .market-price{font-size:clamp(34px,5vw,48px);font-weight:600;letter-spacing:-1.4px;line-height:1.1}.market-price .market-label{font-size:14px;letter-spacing:0;font-weight:400}
+    .chart-wrap{height:210px;margin-top:14px}.chart-wrap svg{width:100%;height:100%;overflow:visible}
+    .tag{font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted);white-space:nowrap}.tag.demo{border-color:#6b5628;color:var(--warn)}
+    form{display:grid;gap:12px}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    label{display:grid;gap:6px;color:var(--muted);font-size:12.5px}
+    input,select{width:100%;min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:8px 11px;color:var(--text);font:inherit}
+    input:disabled{opacity:.6}input::placeholder{color:#62708b}
+    .button{min-height:38px;border:1px solid transparent;border-radius:8px;padding:8px 14px;background:var(--accent);color:var(--accent-ink);font:600 13px var(--font);cursor:pointer;transition:filter .15s}
+    .button:hover{filter:brightness(1.1)}.button:disabled{opacity:.4;cursor:not-allowed;filter:none}
+    .button.buy{background:#1c5a47;color:#aef0d6}.button.sell{background:#6a2a37;color:#ffc3cb}
+    .button.secondary{background:transparent;border-color:var(--line);color:#d3dbec}.button.danger{background:transparent;border-color:#6a2f3b;color:#ffadb8}
+    .button.small{min-height:32px;padding:5px 11px;font-size:12px}.button-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .hint{color:var(--muted);font-size:12px}
+    details{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}details:first-of-type{border-top:0;padding-top:0;margin-top:0}
+    summary{cursor:pointer;font-weight:620;font-size:14px;list-style:none;display:flex;justify-content:space-between;margin-bottom:12px}summary::-webkit-details-marker{display:none}
+    summary::after{content:"+";color:var(--muted)}details[open]>summary::after{content:"–"}
+    .agents,.fills{display:grid;gap:10px}
+    .agent{border:1px solid var(--line);background:var(--s2);border-radius:var(--r);padding:13px 14px}
+    .agent-top{display:flex;justify-content:space-between;gap:12px;align-items:center}.agent-name{font-weight:620;font-size:13.5px}.agent-meta{color:var(--muted);font-size:12px;margin-top:3px}
+    .status{font-size:12px;border-radius:999px;padding:3px 10px;background:#27324b;color:#b9c4da;white-space:nowrap}.status.active{background:#173f33;color:#7fe4bb}.status.warning{background:#3d3118;color:var(--warn)}
+    .agent-controls{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+    .empty{padding:22px 12px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--line);border-radius:var(--r)}.loading{color:var(--muted);padding:22px;text-align:center}
+    .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap}
+    th,td{padding:10px 10px;text-align:left;font-size:12.5px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:500}td{color:#d6dded}tbody tr:last-child td{border-bottom:0}
+    .demo-zone{border-left:3px solid var(--warn)}
+    .demo-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+    .demo-summary{display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 14px;background:var(--s2);border-radius:var(--r);font-size:12.5px;color:var(--muted);margin-bottom:16px}.demo-summary b{color:var(--text);margin-left:4px}
+    .demo-error{border:1px solid #6a2f3b;background:#2a1820;color:#ffc2cb;padding:12px 14px;border-radius:var(--r);font-size:12.5px;margin-bottom:16px}
+    .sub{font-size:13.5px;font-weight:620;margin:0 0 10px}.sub:not(:first-child){margin-top:22px}
+    .legal{margin-top:20px;max-width:90ch}
+    dialog{border:1px solid var(--line);border-radius:14px;background:var(--s1);color:var(--text);padding:22px;width:min(400px,92vw)}dialog::backdrop{background:#000b}
+    .dialog-actions{display:flex;gap:8px;justify-content:flex-end}
+    .toast{position:fixed;right:20px;bottom:20px;max-width:380px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:var(--s2);display:none;box-shadow:0 8px 28px #0008;font-size:13px}
+    @media(max-width:980px){.workspace,.demo-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}}
+    @media(max-width:520px){.panel{padding:16px}.stat{padding:14px 16px}.metric{font-size:22px}.field-row,.button-row{grid-template-columns:1fr}.chart-wrap{height:160px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
   </style>
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand"><div class="brand-mark">⌁</div><div><h1>Agent Desk</h1><div class="subtle">OKX perpetual swap · Demo ve paper trading ayrı hesaplar</div></div></div>
-      <div class="live-tag"><span id="market-dot" class="dot"></span><span id="market-label">Fiyat akışı bekleniyor</span></div>
+      <div class="brand"><h1>Agent Desk</h1><p>OKX ETH-USDT-SWAP · Paper simülasyonu ve OKX Demo ayrı hesaplardır</p></div>
+      <div class="chips"><span class="chip"><span id="market-dot" class="dot"></span><span id="market-label">Fiyat akışı bekleniyor</span></span><span class="chip demo">Canlı hesap kullanılmaz</span></div>
     </header>
-    <div class="notice"><span>ⓘ</span><span><b>Paper ve Demo hesapları ayrı.</b> Paper emirler yalnızca simüle edilir; aşağıdaki onaylı Demo emirleri OKX Demo hesabına gönderilir. Canlı hesap kullanılmaz.</span></div>
-    <section class="metrics">
-      <article class="card"><div class="eyebrow">Portföy değeri</div><div id="equity" class="metric">—</div><div id="balance-foot" class="metric-foot">10.000,00 USDT sanal başlangıç</div></article>
-      <article class="card"><div class="eyebrow">Toplam kâr / zarar</div><div id="total-pnl" class="metric">—</div><div id="pnl-foot" class="metric-foot">Gerçekleşen + açık pozisyon</div></article>
-      <article class="card"><div class="eyebrow">Açık pozisyonlar</div><div id="position-count" class="metric">0</div><div id="position-foot" class="metric-foot">Sanal swap pozisyonu</div></article>
-      <article class="card"><div class="eyebrow">Kullanılabilir teminat</div><div id="margin" class="metric">—</div><div class="metric-foot">Maksimum ajan kaldıracı 5×</div></article>
+    <div class="notice"><b>Paper ve Demo hesapları ayrı.</b> Paper emirler yalnızca simüle edilir. Aşağıdaki onaylı Demo emirleri OKX Demo hesabına gönderilir.</div>
+
+    <section class="panel stats" aria-label="Paper portföy özeti">
+      <div class="stat"><div class="stat-label">Portföy değeri</div><div id="equity" class="metric">—</div><div id="balance-foot" class="metric-foot">10.000,00 USDT sanal başlangıç</div></div>
+      <div class="stat"><div class="stat-label">Toplam kâr / zarar</div><div id="total-pnl" class="metric">—</div><div id="pnl-foot" class="metric-foot">Gerçekleşen + açık pozisyon</div></div>
+      <div class="stat"><div class="stat-label">Açık pozisyonlar</div><div id="position-count" class="metric">0</div><div id="position-foot" class="metric-foot">Sanal swap pozisyonu</div></div>
+      <div class="stat"><div class="stat-label">Kullanılabilir teminat</div><div id="margin" class="metric">—</div><div class="metric-foot">Maksimum ajan kaldıracı 5×</div></div>
     </section>
-    <section class="card demo-card" style="margin-bottom:15px">
-      <div class="section-head"><div><h2>OKX Demo hesabı</h2><div class="market-label">Gerçek OKX Demo bakiyesi ve pozisyonları · Paper portföyünden ayrı</div></div><span class="pill">DEMO · GERÇEK EMİRLER</span></div>
-      <div id="demo-account" class="agents"><div class="loading">Demo hesabı bağlantısı kontrol ediliyor…</div></div>
-      <div class="section-head" style="margin-top:18px"><h2>Onaylı Demo swap emri</h2><span class="market-label">Emir başına üst sınır: 1 kontrat</span></div>
-      <form id="demo-order-form" class="trade-form">
-        <div class="field-row">
-          <label>Emir türü<select id="demo-order-type"><option value="limit">Limit</option><option value="market">Market</option></select></label>
-          <label>Yön<select id="demo-side"><option value="buy">Al / Long</option><option value="sell">Sat / Short</option></select></label>
+
+    <div class="workspace">
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head"><div><h2>OKX piyasa fiyatı</h2><div class="market-label">ETH-USDT-SWAP · her 3 saniyede güncellenir</div></div><span class="tag">Paper</span></div>
+          <div id="price" class="market-price">— <span class="market-label">USDT</span></div>
+          <div class="chart-wrap"><svg id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="Son fiyat hareketleri"></svg></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2>Açık pozisyonlar</h2><span class="market-label">USDT teminatlı swap</span></div>
+          <div id="positions" class="agents"><div class="empty">Açık sanal pozisyon yok.</div></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2>Son işlemler</h2><span class="market-label">Bu cihazda saklanan sanal işlem günlüğü</span></div>
+          <div id="fills" class="table-wrap"><div class="empty">Henüz işlem yok.</div></div>
+        </section>
+      </div>
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head"><h2>İşlem ajanları</h2><span id="agent-count" class="market-label">0 ajan</span></div>
+          <div id="agents" class="agents"><div class="loading">Durum alınıyor…</div></div>
+        </section>
+        <section class="panel">
+          <details open>
+            <summary>Yeni işlem ajanı</summary>
+            <form id="agent-form">
+              <label>Ajan adı<input id="agent-name" maxlength="40" value="Trend ajanı" required></label>
+              <div class="field-row"><label>Kontrat<input id="agent-size" type="number" min="1" max="100" value="1" required></label><label>Kaldıraç<input id="agent-leverage" type="number" min="1" max="5" value="2" required></label></div>
+              <button class="button" type="submit">Ajan oluştur</button>
+              <p class="hint">EMA 9/21 kesişimi · %10 zarar sınırı · en fazla 10 ajan</p>
+            </form>
+          </details>
+          <details open>
+            <summary>Manuel paper emir</summary>
+            <form id="trade-form">
+              <label>Ajan<select id="trade-agent" required></select></label>
+              <div class="field-row"><label>Kontrat<input id="trade-size" type="number" min="1" max="100" value="1" required></label><label>Kaldıraç<input type="text" value="Ajana göre" disabled></label></div>
+              <div class="button-row"><button class="button buy" type="button" id="buy-btn">Al / Long</button><button class="button sell" type="button" id="sell-btn">Sat / Short</button></div>
+              <p class="hint">1 kontrat = 0,01 ETH · komisyon simülasyonu %0,05</p>
+            </form>
+          </details>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel demo-zone" aria-label="OKX Demo hesabı">
+      <div class="panel-head"><div><h2>OKX Demo hesabı</h2><div class="market-label">Gerçek OKX Demo bakiyesi ve pozisyonları · paper portföyünden ayrı</div></div><span class="tag demo">Demo · gerçek emirler</span></div>
+      <div class="demo-grid">
+        <div>
+          <div id="demo-account"><div class="loading">Demo hesabı bağlantısı kontrol ediliyor…</div></div>
+          <h3 class="sub">Onaylı Demo swap emri <span class="market-label">· emir başına en fazla 1 kontrat</span></h3>
+          <form id="demo-order-form">
+            <div class="field-row">
+              <label>Emir türü<select id="demo-order-type"><option value="limit">Limit</option><option value="market">Market</option></select></label>
+              <label>Yön<select id="demo-side"><option value="buy">Al / Long</option><option value="sell">Sat / Short</option></select></label>
+            </div>
+            <div class="field-row">
+              <label>Kontrat<input id="demo-contracts" type="number" min="0.01" max="1" step="0.01" value="0.01" required></label>
+              <label id="demo-price-field">Limit fiyatı (USDT)<input id="demo-price" type="number" min="0" step="any" placeholder="Örn. 3500" required></label>
+            </div>
+            <button id="demo-submit" class="button" type="submit" disabled>Demo emrini incele ve onayla</button>
+            <p class="hint">Yalnızca OKX Demo ortamı · hesabın kaldıraç ayarı değiştirilmez · her emir ayrıca onay ister.</p>
+          </form>
         </div>
-        <div class="field-row">
-          <label>Kontrat<input id="demo-contracts" type="number" min="0.01" max="1" step="0.01" value="0.01" required></label>
-          <label id="demo-price-field">Limit fiyatı (USDT)<input id="demo-price" type="number" min="0" step="any" placeholder="Örn. 3500" required></label>
+        <div>
+          <h3 class="sub">Demo açık pozisyonları</h3>
+          <div id="demo-positions" class="agents"><div class="empty">Demo hesabı henüz yüklenmedi.</div></div>
+          <h3 class="sub">Demo açık emirleri</h3>
+          <div id="demo-orders" class="table-wrap"><div class="empty">Demo hesabı henüz yüklenmedi.</div></div>
         </div>
-        <button id="demo-submit" class="button buy" type="submit" disabled>Demo emrini incele ve onayla</button>
-        <p class="hint">Sadece OKX Demo ortamı · Hesabın kaldıraç ayarı değiştirilmez · Her emir için ayrıca onay istenir.</p>
-      </form>
-      <div class="section-head" style="margin-top:18px"><h2>Demo açık pozisyonları</h2></div>
-      <div id="demo-positions" class="agents"><div class="empty">Demo hesabı henüz yüklenmedi.</div></div>
-      <div class="section-head" style="margin-top:18px"><h2>Demo açık emirleri</h2></div>
-      <div id="demo-orders" class="table-wrap"><div class="empty">Demo hesabı henüz yüklenmedi.</div></div>
+      </div>
     </section>
-    <section class="grid">
-      <article class="card">
-        <div class="section-head"><div><h2>OKX piyasa fiyatı</h2><div class="market-label">ETH-USDT-SWAP · Her 3 saniyede güncellenir</div></div><span class="paper-tag">PAPER</span></div>
-        <div id="price" class="market-price">— <span class="market-label">USDT</span></div>
-        <div class="chart-wrap"><svg id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="Son fiyat hareketleri"></svg></div>
-      </article>
-      <article class="card">
-        <div class="section-head"><h2>Manuel paper emir</h2></div>
-        <form id="trade-form" class="trade-form">
-          <label>Ajan<select id="trade-agent" required></select></label>
-          <div class="field-row">
-            <label>Kontrat<input id="trade-size" type="number" min="1" max="100" value="1" required></label>
-            <label>Kaldıraç<input type="text" value="Ajana göre" disabled></label>
-          </div>
-          <div class="button-row"><button class="button buy" type="button" id="buy-btn">Al / Long</button><button class="button sell" type="button" id="sell-btn">Sat / Short</button></div>
-          <p class="hint">1 kontrat = 0,01 ETH · İşlem komisyonu simülasyonu %0,05</p>
-        </form>
-        <div style="height:18px"></div>
-        <div class="section-head"><h2>Yeni işlem ajanı</h2></div>
-        <form id="agent-form" class="agent-form">
-          <label>Ajan adı<input id="agent-name" maxlength="40" value="Trend ajanı" required></label>
-          <div class="field-row"><label>Kontrat<input id="agent-size" type="number" min="1" max="100" value="1" required></label><label>Kaldıraç<input id="agent-leverage" type="number" min="1" max="5" value="2" required></label></div>
-          <button class="button" type="submit">+ Ajan oluştur</button>
-          <p class="hint">Kural tabanlı EMA 9/21 kesişimi · %10 zarar sınırı · Maksimum 10 ajan</p>
-        </form>
-      </article>
-      <article class="card">
-        <div class="section-head"><h2>İşlem ajanları</h2><span id="agent-count" class="market-label">0 ajan</span></div>
-        <div id="agents" class="agents"><div class="loading">Durum alınıyor…</div></div>
-      </article>
-      <article class="card">
-        <div class="section-head"><h2>Açık pozisyonlar</h2><span class="market-label">USDT teminatlı swap</span></div>
-        <div id="positions" class="agents"><div class="empty">Açık sanal pozisyon yok.</div></div>
-      </article>
-      <article class="card wide">
-        <div class="section-head"><h2>Son işlemler</h2><span class="market-label">Bu cihazda saklanan sanal işlem günlüğü</span></div>
-        <div id="fills" class="table-wrap"><div class="empty">Henüz işlem yok.</div></div>
-      </article>
-    </section>
-    <p class="hint">Demo emirleri gerçek para kullanmasa da OKX Demo hesabında gerçekleşir; emir vermeden önce her zaman hesap ve pozisyon bilgilerini doğrulayın. Otomatik ajan yalnızca paper ortamında çalışır ve yatırım tavsiyesi değildir.</p>
+    <p class="hint legal">Demo emirleri gerçek para kullanmasa da OKX Demo hesabında gerçekleşir; emir vermeden önce hesap ve pozisyon bilgilerini doğrulayın. Otomatik ajan yalnızca paper ortamında çalışır ve yatırım tavsiyesi değildir.</p>
   </main>
+
   <dialog id="edit-dialog">
-    <form id="edit-form" class="agent-form" method="dialog">
-      <div class="section-head"><h2>Ajanı düzenle</h2></div>
+    <form id="edit-form" method="dialog">
+      <div class="panel-head" style="margin:0"><h2>Ajanı düzenle</h2></div>
       <label>Ajan adı<input id="edit-name" maxlength="40" required></label>
       <div class="field-row"><label>Kontrat<input id="edit-size" type="number" min="1" max="100" required></label><label>Kaldıraç<input id="edit-leverage" type="number" min="1" max="5" required></label></div>
       <p id="edit-hint" class="hint">Açık pozisyon varken kontrat ve kaldıraç değiştirilemez; yalnızca ad güncellenir.</p>
       <div class="dialog-actions"><button type="button" id="edit-cancel" class="button small secondary">Vazgeç</button><button type="submit" class="button small">Kaydet</button></div>
     </form>
   </dialog>
-  <div id="toast" class="toast" role="status"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script>
     const $ = (id) => document.getElementById(id);
     let agents = [];
@@ -130,7 +174,7 @@
     function showToast(message, error = false) {
       const toast = $("toast");
       toast.textContent = message;
-      toast.style.borderColor = error ? "#8b3d49" : "#406d5a";
+      toast.style.borderColor = error ? "#8b3d49" : "#2f7d62";
       toast.style.display = "block";
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => toast.style.display = "none", 3600);
@@ -152,10 +196,10 @@
       const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
       line.setAttribute("points", points);
       line.setAttribute("fill", "none");
-      line.setAttribute("stroke", values.at(-1) >= values[0] ? "#4cdda2" : "#ff7385");
+      line.setAttribute("stroke", values.at(-1) >= values[0] ? "#3ccf9f" : "#ff6f84");
       line.setAttribute("stroke-width", "2.5");
       line.setAttribute("vector-effect", "non-scaling-stroke");
-      svg.innerHTML = '<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4cdda2" stop-opacity=".2"/><stop offset="100%" stop-color="#4cdda2" stop-opacity="0"/></linearGradient></defs>';
+      svg.innerHTML = '<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3ccf9f" stop-opacity=".2"/><stop offset="100%" stop-color="#3ccf9f" stop-opacity="0"/></linearGradient></defs>';
       svg.append(fill, line);
     }
     function renderAgents(items) {
