@@ -1,0 +1,90 @@
+name: Gemini PR Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  gemini-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Repoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: Python Ortamını Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Bağımlılıkları Yükle
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: PR Diff Al ve Gemini İncelemesi Çalıştır
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # PR kod farklarını (diff) al
+          gh pr diff $PR_NUMBER > pr_diff.txt
+
+          # Gemini API entegrasyonu ve yorum paylaşımı
+          python -c "
+          import os
+          import json
+          import subprocess
+          import requests
+
+          api_key = os.getenv('GEMINI_API_KEY')
+          pr_number = os.getenv('PR_NUMBER')
+
+          with open('pr_diff.txt', 'r', encoding='utf-8') as f:
+              diff_text = f.read()
+
+          if not diff_text.strip():
+              print('İncelenecek kod değişikliği bulunamadı.')
+              exit(0)
+
+          # Çok büyük PR'lar için karakter sınırı (gerekirse kırpma)
+          if len(diff_text) > 30000:
+              diff_text = diff_text[:30000] + '\n\n...[Diff çok uzun olduğu için kalan kısım kırpıldı]'
+
+          prompt = f'''Sen kıdemli bir yazılım mimarısın. Aşağıdaki Pull Request (PR) diff kod değişikliklerini incele.
+
+          Lütfen Türkçe olarak şu başlıklar altında geri bildirim ver:
+          1. 📌 **Özet**: Yapılan değişikliklerin kısa ve öz açıklaması.
+          2. ⚠️ **Potansiyel Hatalar ve Güvenlik Riskleri**: Mantık hataları, performans sorunları veya güvenlik açıkları.
+          3. 💡 **İyileştirme Önerileri**: Clean code, okunabilirlik ve refactoring tavsiyeleri.
+
+          **PR Diff:**
+          \`\`\`diff
+          {diff_text}
+          \`\`\`'''
+
+          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}'
+          headers = {'Content-Type': 'application/json'}
+          payload = {
+              'contents': [{'parts': [{'text': prompt}]}]
+          }
+
+          response = requests.post(url, headers=headers, json=payload)
+          data = response.json()
+
+          try:
+              ai_review = data['candidates'][0]['content']['parts'][0]['text']
+          except Exception as e:
+              ai_review = f'Gemini yanıtı işlenirken hata oluştu: {str(e)}\n\nHata Detayı: {json.dumps(data)}'
+
+          comment_body = f'### 🤖 Gemini PR Kod İncelemesi\n\n' + ai_review
+
+          with open('review_comment.md', 'w', encoding='utf-8') as rf:
+              rf.write(comment_body)
+
+          subprocess.run(['gh', 'pr', 'comment', pr_number, '--body-file', 'review_comment.md'], check=True)
+          "
