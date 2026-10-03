@@ -1,4 +1,26 @@
-- name: Bağımlılıkları Yükle
+name: Gemini PR Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  gemini-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Repoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: Python Ortamını Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Bağımlılıkları Yükle
         run: |
           python -m pip install --upgrade pip
           pip install google-generativeai
@@ -9,10 +31,8 @@
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # PR kod farklarını (diff) al
           gh pr diff $PR_NUMBER > pr_diff.txt
 
-          # Resmi SDK ile Gemini API entegrasyonu
           python -c "
           import os
           import subprocess
@@ -21,7 +41,6 @@
           api_key = os.getenv('GEMINI_API_KEY')
           pr_number = os.getenv('PR_NUMBER')
 
-          # Gemini API Yapılandırması
           genai.configure(api_key=api_key)
 
           with open('pr_diff.txt', 'r', encoding='utf-8') as f:
@@ -34,18 +53,18 @@
           if len(diff_text) > 30000:
               diff_text = diff_text[:30000] + '\n\n...[Diff çok uzun olduğu için kalan kısım kırpıldı]'
 
-          prompt = f'''Sen kıdemli bir yazılım mimarısın. Aşağıdaki Pull Request (PR) diff kod değişikliklerini incele.
+          prompt = f'''Sen asenkron Python uygulamaları ve algoritmik ticaret sistemleri (özellikle OKX API v5 ve WebSocket yapıları) konusunda uzman kıdemli bir yazılım mimarısın.
+          Aşağıdaki Pull Request (PR) diff kod değişikliklerini incele. Özellikle asenkron yapı (asyncio), durum yönetimi ve emir iletimi kısımlarında olası hatalara dikkat et.
 
           Lütfen Türkçe olarak şu başlıklar altında geri bildirim ver:
           1. 📌 **Özet**: Yapılan değişikliklerin kısa ve öz açıklaması.
-          2. ⚠️ **Potansiyel Hatalar ve Güvenlik Riskleri**: Mantık hataları, performans sorunları veya güvenlik açıkları.
-          3. 💡 **İyileştirme Önerileri**: Clean code, okunabilirlik ve refactoring tavsiyeleri.
+          2. ⚠️ **Potansiyel Hatalar ve Güvenlik Riskleri**: Asenkron mantık hataları, race condition, borsa API entegrasyonu problemleri veya güvenlik açıkları.
+          3. 💡 **İyileştirme Önerileri**: Clean code, okunabilirlik ve performans iyileştirme tavsiyeleri.
 
           **PR Diff:**
           {diff_text}'''
 
           try:
-              # Model tanımlaması ve içerik üretimi
               model = genai.GenerativeModel('gemini-1.5-flash')
               response = model.generate_content(prompt)
               ai_review = response.text
