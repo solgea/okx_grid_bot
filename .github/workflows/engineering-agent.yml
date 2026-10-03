@@ -26,7 +26,7 @@ on:
         type: string
 
 concurrency:
-  group: okx-engineering-agent-${{ github.event.workflow_run.id@@ || ${{ github.event.inputs.issue_number@@ || ${{ github.event.inputs.pr_number@@ || ${{ github.run_id@@
+  group: okx-engineering-agent-${{ github.event.workflow_run.id || github.event.inputs.issue_number || github.event.inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
