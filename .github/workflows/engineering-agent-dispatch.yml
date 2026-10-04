@@ -25,8 +25,8 @@ on:
         type: string
 
 concurrency:
-  group: okx-engineering-agent-${{ github.event.workflow_run.id || github.event.inputs.issue_number || github.event.inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
+  group: okx-engineering-agent-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.run_id }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (
         github.event.workflow_run.name == 'CI' &&
-        github.event.workflow_run.conclusion != 'cancelled' &&
+        github.event.workflow_run.conclusion == 'failure' &&
         github.event.workflow_run.pull_requests[0].number != null
       )
     runs-on: ubuntu-latest
@@ -54,6 +54,7 @@ jobs:
       TASK_ID: ${{ github.event.inputs.task_id || 'CI-G8-AUTO' }}
       TASK_ISSUE: ${{ github.event.inputs.issue_number || '' }}
       EVENT_NAME: ${{ github.event_name }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       TRIGGER_CI_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
 
     steps:
@@ -136,7 +137,22 @@ jobs:
             LIMIT=true
             echo "::warning::Same blocker (${BLOCKER_SIG}) already attempted ${PREV_N}/${MAX_N} times; agent will make no change."
           fi
+          LIMIT_REASON="same-failure"
+          # Independent runaway guard: consecutive agent fix commits on this branch.
+          if [ "${EVENT_NAME:-}" = "workflow_run" ]; then
+            CHAIN=0
+            while IFS='|' read -r AUTHOR SUBJECT; do
+              [ "$AUTHOR" = "okx-engineering-agent" ] || break
+              case "$SUBJECT" in "agent: fix"*) CHAIN=$((CHAIN + 1)) ;; esac
+            done < <(git log -n 20 --format='%an|%s' 2>/dev/null || true)
+            if [ "$CHAIN" -ge 3 ]; then
+              LIMIT=true
+              LIMIT_REASON="chain"
+              echo "::warning::Agent already pushed ${CHAIN} consecutive fixes on this branch; stopping the autonomous chain."
+            fi
+          fi
           {
+            echo "LIMIT_REASON=$LIMIT_REASON"
             echo "PREV_SIG=$PREV_SIG"
             echo "PREV_ATTEMPTS=$PREV_N"
             echo "MAX_ATTEMPTS=$MAX_N"
@@ -203,20 +219,54 @@ jobs:
           test -n "$GROQ_API_KEY" || { echo "GROQ_API_KEY is required."; exit 1; }
           aider --model groq/openai/gpt-oss-120b --no-auto-commits --no-dirty-commits --no-auto-lint --no-auto-test --no-stream --yes-always --message-file agent/runtime/AGENT_PROMPT.md
 
-      - name: Validate agent result
-        id: validate
+      - name: Check agent change policy
+        id: policy
         if: env.TASK_ID != 'EA-OKX-READONLY-001' && env.AGENT_LIMIT_REACHED != 'true'
         shell: bash
         run: |
           set -euo pipefail
           rm -f agent/runtime/CI_CONTEXT.md agent/runtime/CI_SUMMARY.json agent/runtime/CI_FAILURE.log agent/runtime/AGENT_PROMPT.md
           # The agent must not rewrite its own failure counter or report.
-          git checkout -- agent/STATE.md agent/REPORT.md 2>/dev/null || true
-          if git diff --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+          for F in agent/STATE.md agent/REPORT.md; do git checkout -- "$F" 2>/dev/null || true; done
+          CHANGED="$( { git diff --no-renames --name-only HEAD; git ls-files --others --exclude-standard; } | grep -v '^agent/runtime/' | sort -u || true)"
+          if [ -z "$CHANGED" ]; then
+            { echo "changed=false"; echo "rejected=false"; echo "reason=none"; echo "review=false"; } >> "$GITHUB_OUTPUT"
             echo "No repository change produced."
             exit 0
           fi
+          REJECT=""
+          # Files the agent may never touch: CI, runtime image, dependencies, policy, execution scripts.
+          if printf '%s\n' "$CHANGED" | grep -qE '^(\.github/|Dockerfile|docker-compose[^/]*\.ya?ml$|requirements[^/]*\.txt$|\.env|\.gitignore$|AGENTS\.md$|agent/(POLICY|GATE_PLAN)\.md$|scripts/)'; then
+            REJECT="denied-path"
+          fi
+          # Tests may be added but never removed or reduced.
+          BASE_TESTS="$( { git grep -hE '^[[:space:]]*(async[[:space:]]+)?def test_' HEAD -- '*test_*.py' || true; } | wc -l)"
+          NOW_TESTS="$( { grep -rhE '^[[:space:]]*(async[[:space:]]+)?def test_' --include='test_*.py' --exclude-dir=.git . || true; } | wc -l)"
+          if [ -z "$REJECT" ] && [ "$NOW_TESTS" -lt "$BASE_TESTS" ]; then REJECT="tests-reduced"; fi
+          # One logical fix: bounded size.
+          FILES="$(printf '%s\n' "$CHANGED" | wc -l)"
+          TRACKED_LINES="$(git diff --no-renames --numstat HEAD | awk '{a+=$1; d+=$2} END {print a+d+0}')"
+          NEW_LINES="$( { git ls-files --others --exclude-standard | grep -v '^agent/runtime/' || true; } | xargs -r cat | wc -l)"
+          if [ -z "$REJECT" ] && { [ "$FILES" -gt 8 ] || [ $((TRACKED_LINES + NEW_LINES)) -gt 300 ]; }; then REJECT="too-large"; fi
+          REVIEW=false
+          if printf '%s\n' "$CHANGED" | grep -qE '^(preflight_layer/|config/|engine/|risk/)'; then REVIEW=true; fi
+          {
+            echo "changed=true"
+            echo "rejected=$([ -n "$REJECT" ] && echo true || echo false)"
+            echo "reason=${REJECT:-none}"
+            echo "review=$REVIEW"
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$REJECT" ]; then
+            echo "::warning::Agent change rejected by policy ($REJECT). Changed files:"
+            printf '%s\n' "$CHANGED"
+          fi
+
+      - name: Validate agent result
+        id: validate
+        if: env.TASK_ID != 'EA-OKX-READONLY-001' && env.AGENT_LIMIT_REACHED != 'true' && steps.policy.outputs.changed == 'true' && steps.policy.outputs.rejected != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
           git diff --check
           python -m compileall -q .
           pytest -q
@@ -257,6 +307,7 @@ jobs:
           exit "$rc"
 
       - name: Publish normal agent change
+        id: publish
         if: env.TASK_ID != 'EA-OKX-READONLY-001' && steps.validate.outputs.changed == 'true'
         shell: bash
         env:
@@ -264,11 +315,15 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$PUSH_TOKEN" || { echo "AGENT_GITHUB_TOKEN is required for autonomous CI chaining."; exit 1; }
+          if [ "$HEAD_BRANCH" = "${DEFAULT_BRANCH:-main}" ]; then
+            echo "Refusing to push agent changes to the default branch."
+            exit 1
+          fi
           git config user.name "okx-engineering-agent"
           git config user.email "okx-engineering-agent@users.noreply.github.com"
-          git add -A
+          git add -A -- . ':!agent/runtime'
           git commit -m "agent: fix first CI blocker"
-          git remote set-url origin "https://x-access-token:$PUSH_TOKEN@github.com/${{ github.repository }}.git"
+          git remote set-url origin "https://x-access-token:$PUSH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           git push origin "HEAD:$HEAD_BRANCH"
 
       - name: Run focused validation for EA task
@@ -286,6 +341,11 @@ jobs:
           PUSH_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
           RUNTIME_OUTCOME: ${{ steps.readonly_runtime.outcome || 'not-run' }}
           VALIDATION: ${{ steps.validate.outcome || 'not-run' }}
+          AGENT_OUTCOME: ${{ steps.agent.outcome || 'not-run' }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome || 'not-run' }}
+          POLICY_REJECTED: ${{ steps.policy.outputs.rejected || 'false' }}
+          POLICY_REASON: ${{ steps.policy.outputs.reason || 'none' }}
+          POLICY_REVIEW: ${{ steps.policy.outputs.review || 'false' }}
           AGENT_MESSAGE: ${{ steps.agent.outputs.final-message || 'Task-specific runtime validation path.' }}
         run: |
           set -euo pipefail
@@ -308,6 +368,18 @@ jobs:
           if [ "$TASK_ID" = "EA-OKX-READONLY-001" ]; then
             if [ "$OKX_STATUS" = "PASS" ]; then SIG="none"; else SIG="readonly:${OKX_STATUS}"; fi
           fi
+          FAILED_STEP=""
+          if [ "${AGENT_OUTCOME:-}" = "failure" ]; then FAILED_STEP="agent"; fi
+          if [ "${VALIDATION:-}" = "failure" ]; then FAILED_STEP="validate"; fi
+          if [ "${PUBLISH_OUTCOME:-}" = "failure" ]; then FAILED_STEP="publish"; fi
+          if [ "${POLICY_REJECTED:-false}" = "true" ]; then
+            SIG="policy:${POLICY_REASON}"
+            STATUS="BLOCKED"
+            AGENT_MESSAGE="Agent change rejected by policy (${POLICY_REASON}); nothing was pushed."
+          elif [ -n "$FAILED_STEP" ]; then
+            SIG="failed:${FAILED_STEP}"
+            STATUS="BLOCKED"
+          fi
           LIMIT_REACHED="${AGENT_LIMIT_REACHED:-false}"
           PREV_N="${PREV_ATTEMPTS:-0}"
           MAX_N="${MAX_ATTEMPTS:-2}"
@@ -320,7 +392,11 @@ jobs:
           fi
           if [ "$LIMIT_REACHED" = "true" ]; then
             STATUS="BLOCKED"
-            AGENT_MESSAGE="Stopped: the same blocker ($SIG) was already attempted $PREV_N/$MAX_N times. No change made; human review required."
+            if [ "${LIMIT_REASON:-same-failure}" = "chain" ]; then
+              AGENT_MESSAGE="Stopped: the agent already pushed consecutive fixes on this branch. No change made; human review required."
+            else
+              AGENT_MESSAGE="Stopped: the same blocker ($SIG) was already attempted $PREV_N/$MAX_N times. No change made; human review required."
+            fi
           fi
           CI_CONCLUSION="unknown"
           if [ -n "$CI_RUN_ID" ]; then
@@ -363,6 +439,8 @@ jobs:
             echo "- OKX Demo read-only runtime: $OKX_STATUS"
             echo "- Runtime outcome: $RUNTIME_OUTCOME"
             echo "- Blocker: $SIG"
+            echo "- Change policy: ${POLICY_REASON:-none}"
+            if [ "${POLICY_REVIEW:-false}" = "true" ]; then echo "- Safety-critical paths touched: human review required"; fi
             echo "- Same-failure attempts: $ATTEMPTS/$MAX_N"
             echo "- Live trading: BLOCKED"
             echo "- Auto merge: BLOCKED"
@@ -375,13 +453,15 @@ jobs:
             echo "$AGENT_MESSAGE"
           } > agent/REPORT.md
           gh pr comment "$PR_NUMBER" --body-file agent/REPORT.md
-          if [ -n "$PUSH_TOKEN" ]; then
+          if [ -n "$PUSH_TOKEN" ] && [ "$HEAD_BRANCH" = "${DEFAULT_BRANCH:-main}" ]; then
+            echo "::warning::Refusing to push agent state to the default branch."
+          elif [ -n "$PUSH_TOKEN" ]; then
             git config user.name "okx-engineering-agent"
             git config user.email "okx-engineering-agent@users.noreply.github.com"
             git add agent/STATE.md agent/REPORT.md
             if ! git diff --cached --quiet; then
               git commit -m "agent: persist task state and report [skip ci]"
-              git remote set-url origin "https://x-access-token:$PUSH_TOKEN@github.com/${{ github.repository }}.git"
+              git remote set-url origin "https://x-access-token:$PUSH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
               git push origin "HEAD:$HEAD_BRANCH"
             fi
           fi
