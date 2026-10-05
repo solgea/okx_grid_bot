@@ -258,6 +258,13 @@ async def main():
                     confluence_score=latest_market["confluence_score"],
                 )
 
+                open_orders_snapshot = await engine.fetch_open_orders(config.SYMBOL)
+                current_account.current_position_size = Decimal(str(current_position_size))
+                current_account.open_order_exposure = sum(
+                    (abs(Decimal(str(order.get("amount") or 0))) for order in open_orders_snapshot),
+                    Decimal("0"),
+                )
+
                 preflight_account = current_account
                 preflight_market = MarketData(
                     bid=Decimal(str(current_price)),

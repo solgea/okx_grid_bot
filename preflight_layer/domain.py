@@ -48,6 +48,8 @@ class AccountState:
     balance: Decimal = Decimal("0.0")
     available_margin: Decimal = Decimal("0.0")
     leverage: Decimal = Decimal("10")
+    current_position_size: Decimal = Decimal("0")
+    open_order_exposure: Decimal = Decimal("0")
 
 @dataclass
 class MarketData:
