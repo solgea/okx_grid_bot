@@ -3,6 +3,7 @@ from decimal import Decimal
 from preflight_layer.interfaces import IRiskManager
 from engine.risk_manager import RiskManager
 from config.settings import config
+from preflight_layer.risk_policy import RiskPolicy
 
 logger = logging.getLogger("RiskPreFlightAdapter")
 
@@ -29,7 +30,7 @@ class RiskPreFlightAdapter(IRiskManager):
         """
         # 1. Statik Config Limiti (Miktar bazlı)
         if hasattr(config, 'MAX_POSITION_SIZE'):
-            max_limit = Decimal(str(config.MAX_POSITION_SIZE))
+            max_limit = Decimal(str(self.policy.max_position_size))
             
             if intent.size > max_limit:
                 logger.error(
