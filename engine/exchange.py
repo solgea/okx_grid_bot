@@ -119,8 +119,20 @@ class OKXEngine:
             self.connected = False
             raise
 
+    def _assert_mutation_authorized(self):
+        """Fail closed before any non-Demo exchange mutation."""
+        if config.IS_DEMO:
+            return
+        if config.DRY_RUN:
+            return
+        if not config.LIVE_TRADING_ENABLED or not config.LIVE_TRADING_AUTHORIZED:
+            raise PermissionError(
+                "Live trading mutation blocked: explicit live authorization is required."
+            )
+
     async def place_order(self, symbol, side, amount, price=None, order_type="limit", params=None):
         params = dict(params or {})
+        self._assert_mutation_authorized()
         if config.DRY_RUN:
             return {"status": "simulated", "side": side, "amount": amount, "price": price, "params": params}
 
@@ -142,6 +154,7 @@ class OKXEngine:
     async def create_orders(self, symbol, orders):
         if not orders:
             return []
+        self._assert_mutation_authorized()
         if config.DRY_RUN:
             return [{"status": "simulated", "symbol": symbol, **order} for order in orders]
         payload = []
@@ -166,6 +179,7 @@ class OKXEngine:
     async def cancel_orders(self, order_ids, symbol=None):
         if not order_ids:
             return []
+        self._assert_mutation_authorized()
         symbol = symbol or config.SYMBOL
         if config.DRY_RUN:
             return [{"id": oid, "status": "simulated"} for oid in order_ids]
@@ -188,6 +202,7 @@ class OKXEngine:
             raise
 
     async def cancel_order(self, order_id, symbol):
+        self._assert_mutation_authorized()
         if config.DRY_RUN:
             return True
         try:
@@ -199,6 +214,7 @@ class OKXEngine:
             raise
 
     async def cancel_all_orders(self, symbol):
+        self._assert_mutation_authorized()
         if config.DRY_RUN:
             return True
         try:
