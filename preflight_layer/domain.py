@@ -57,6 +57,16 @@ class MarketData:
     timestamp: float = 0.0
 
 @dataclass
+class TradingSnapshot:
+    """Snapshot boundary for account, market, and exposure inputs."""
+    account: AccountState
+    market: MarketData
+    position_size: Decimal = Decimal("0")
+    open_order_exposure: Decimal = Decimal("0")
+    timestamp: float = 0.0
+
+
+@dataclass
 class ValidationCheck:
     check_name: str
     passed: bool

@@ -26,7 +26,7 @@ from adapters.risk_adapter import RiskPreFlightAdapter
 from engine.exchange import OKXEngine
 from strategy.grid_engine import GridEngine
 from strategy.smc_engine import SMCVolumeEngine
-from preflight_layer.domain import AccountState, MarketData
+from preflight_layer.domain import MarketData
 from engine.risk_manager import RiskManager
 from engine.sync_engine import OrderSyncEngine
 from adapters.market_stream import MarketEvent
@@ -131,10 +131,8 @@ async def main():
                 pass
         stream_task = asyncio.create_task(consume_market_events(), name="okx-market-stream")
         
-        initial_balance = await engine.fetch_balance()
-        if not initial_balance or initial_balance == 0.0:
-            initial_balance = 1000.0  
-            
+        initial_account = await exchange_adapter.fetch_account_state()
+        initial_balance = float(initial_account.balance)
         risk.initialize_balance(initial_balance)
         logger.info(f"💰 Başlangıç Cüzdan Bakiyesi Kaydedildi: {initial_balance:.2f} USDT")
         
@@ -171,9 +169,8 @@ async def main():
                 unrealized_pnl = position_data.get("unrealizedPnl", 0.0)
                 entry_price = position_data.get("entryPrice", 0.0)
 
-                current_wallet_balance = await engine.fetch_balance()
-                if not current_wallet_balance or current_wallet_balance == 0.0:
-                    current_wallet_balance = initial_balance
+                current_account = await exchange_adapter.fetch_account_state()
+                current_wallet_balance = float(current_account.balance)
 
                 realized_pnl = current_wallet_balance - initial_balance
                 total_pnl = realized_pnl + unrealized_pnl
@@ -250,11 +247,7 @@ async def main():
                     confluence_score=latest_market["confluence_score"],
                 )
 
-                preflight_account = AccountState(
-                    balance=Decimal(str(current_wallet_balance)),
-                    available_margin=Decimal(str(current_wallet_balance)),
-                    leverage=Decimal(str(config.LEVERAGE)),
-                )
+                preflight_account = current_account
                 preflight_market = MarketData(
                     bid=Decimal(str(current_price)),
                     ask=Decimal(str(current_price)),
