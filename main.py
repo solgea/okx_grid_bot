@@ -26,7 +26,7 @@ from adapters.risk_adapter import RiskPreFlightAdapter
 from engine.exchange import OKXEngine
 from strategy.grid_engine import GridEngine
 from strategy.smc_engine import SMCVolumeEngine
-from preflight_layer.domain import AccountState, MarketData
+from preflight_layer.domain import MarketData
 from engine.risk_manager import RiskManager
 from engine.sync_engine import OrderSyncEngine
 from adapters.market_stream import MarketEvent
