@@ -40,7 +40,9 @@ class OKXPreFlightAdapter(IExchangeAdapter):
             min_size=Decimal(str(raw_info.get("minSz", market["limits"]["amount"]["min"]))),
             tick_size=Decimal(str(raw_info.get("tickSz", market["precision"]["price"]))),
             lot_size=Decimal(str(raw_info.get("lotSz", market["precision"]["amount"]))),
-            contract_val=Decimal(str(raw_info.get("ctVal", "1"))),
+            contract_val=Decimal(str(raw_info.get("ctVal", "0"))),
+            contract_val_ccy=str(raw_info.get("ctValCcy", "")),
+            contract_type=str(raw_info.get("ctType", "linear")).lower(),
             is_live=raw_info.get("state", "live") == "live",
         )
 
