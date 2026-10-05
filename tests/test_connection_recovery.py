@@ -1,4 +1,5 @@
 import asyncio
+from decimal import Decimal
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -6,6 +7,7 @@ from ccxt.base.errors import NetworkError
 
 from engine.exchange import OKXEngine
 from engine.sync_engine import OrderSyncEngine
+from preflight_layer.domain import ExecutionAuthorization, OrderIntent, OrderSide, OrderType
 
 
 @pytest.mark.asyncio
@@ -33,8 +35,17 @@ async def test_sync_does_not_cancel_orders_when_snapshot_fails():
 
     sync = OrderSyncEngine(engine)
 
+    intent = OrderIntent(
+        instrument_id="ETH/USDT:USDT",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+        price=Decimal("2500"),
+        size=Decimal("0.01"),
+    )
+    authorization = ExecutionAuthorization.from_authorized_intents([intent])
+
     with pytest.raises(NetworkError):
-        await sync.sync_orders([])
+        await sync.sync_orders([intent], authorization=authorization)
 
     exchange.cancel_orders.assert_not_awaited()
 

@@ -65,13 +65,17 @@ async def test_pf031_rejected_batch_never_reaches_submission(monkeypatch):
     validator = PreFlightValidator()
     manager = OrderManager(adapter=exchange, validator=validator)
 
-    accepted = manager.validate_intents([rejected_intent()], metadata(), account(), market())
+    accepted, authorization = manager.authorize_intents(
+        [rejected_intent()], metadata(), account(), market()
+    )
 
     assert accepted == []
+    assert authorization.authorized is False
     assert validator.state.value == "REJECTED"
 
     sync = OrderSyncEngine(exchange)
-    await sync.sync_orders(accepted)
+    with pytest.raises(PermissionError):
+        await sync.sync_orders(accepted, authorization=authorization)
 
-    exchange.fetch_open_orders.assert_awaited_once()
+    exchange.fetch_open_orders.assert_not_awaited()
     exchange.create_orders.assert_not_awaited()

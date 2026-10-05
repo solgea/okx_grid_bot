@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import hashlib
 from enum import Enum
 from decimal import Decimal
 from typing import Optional, List
@@ -67,6 +68,89 @@ class ValidationResult:
     rejection_code: Optional[str] = None
     message: str = ""
     checks: List[ValidationCheck] = field(default_factory=list)
+
+
+def _intent_fingerprint(intents) -> str:
+    """Return a deterministic digest binding authorization to exact intents."""
+    canonical = []
+    for intent in intents:
+        canonical.append(
+            "|".join(
+                (
+                    str(intent.instrument_id),
+                    str(intent.side.value),
+                    str(intent.order_type.value),
+                    str(intent.price),
+                    str(intent.size),
+                    str(intent.leverage),
+                    str(intent.margin_mode),
+                    str(intent.position_side),
+                    str(intent.reduce_only),
+                    str(intent.client_order_id),
+                )
+            )
+        )
+    payload = "\n".join(canonical).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+@dataclass(frozen=True)
+class ExecutionAuthorization:
+    """Fail-closed authorization token for the exchange execution boundary."""
+
+    authorized: bool
+    state: PreFlightState
+    intent_count: int
+    fingerprint: str
+    rejection_code: Optional[str] = None
+    message: str = ""
+
+    @classmethod
+    def from_authorized_intents(cls, intents):
+        intents = tuple(intents)
+        if not intents:
+            return cls(
+                authorized=False,
+                state=PreFlightState.REJECTED,
+                intent_count=0,
+                fingerprint=_intent_fingerprint(intents),
+                rejection_code=PF030_TRADING_HALTED,
+                message="No preflight-authorized intents are available for execution.",
+            )
+        return cls(
+            authorized=True,
+            state=PreFlightState.AUTHORIZED,
+            intent_count=len(intents),
+            fingerprint=_intent_fingerprint(intents),
+            message="Execution authorized by PreFlight.",
+        )
+
+    @classmethod
+    def rejected(cls, message: str, rejection_code: Optional[str] = None):
+        return cls(
+            authorized=False,
+            state=PreFlightState.REJECTED,
+            intent_count=0,
+            fingerprint=_intent_fingerprint(()),
+            rejection_code=rejection_code,
+            message=message,
+        )
+
+    def require_for(self, intents) -> None:
+        """Raise unless this authorization matches the exact execution intents."""
+        intents = tuple(intents)
+        if not self.authorized or self.state is not PreFlightState.AUTHORIZED:
+            raise PermissionError(
+                self.message or "Execution authorization is not AUTHORIZED."
+            )
+        if len(intents) != self.intent_count:
+            raise PermissionError(
+                "Execution authorization intent count does not match target intents."
+            )
+        if _intent_fingerprint(intents) != self.fingerprint:
+            raise PermissionError(
+                "Execution authorization does not match target intents."
+            )
 
 # --- PREFLIGHT RED KODLARI (REJECTION CODES) ---
 PF001_INVALID_INSTRUMENT = "PF001_INVALID_INSTRUMENT"

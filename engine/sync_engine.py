@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any, Optional
 from config.settings import config
 from strategy.order_reconciler import ExistingOrder, GridOrderSpec, OrderReconciler
+from preflight_layer.domain import ExecutionAuthorization
 
 logger = logging.getLogger("OrderSyncEngine")
 _BATCH_SIZE = 20
@@ -68,12 +69,32 @@ class OrderSyncEngine:
             size_tolerance=_SIZE_TOLERANCE,
         )
 
-    async def sync_orders(self, target_intents: Iterable[Any], is_limit_breached: bool = False) -> None:
+    async def sync_orders(
+        self,
+        target_intents: Iterable[Any],
+        *,
+        authorization: ExecutionAuthorization,
+        is_limit_breached: bool = False,
+    ) -> None:
+        """Reconcile only an exact batch authorized by PreFlight."""
+        target_intents = tuple(target_intents)
+        authorization.require_for(target_intents)
         async with self._sync_lock:
-            await self._sync_orders_locked(target_intents, is_limit_breached)
+            await self._sync_orders_locked(
+                target_intents,
+                authorization=authorization,
+                is_limit_breached=is_limit_breached,
+            )
 
-    async def _sync_orders_locked(self, target_intents: Iterable[Any], is_limit_breached: bool = False) -> None:
+    async def _sync_orders_locked(
+        self,
+        target_intents: Iterable[Any],
+        *,
+        authorization: ExecutionAuthorization,
+        is_limit_breached: bool = False,
+    ) -> None:
         try:
+            authorization.require_for(target_intents)
             raw_open_orders = await self.engine.fetch_open_orders(config.SYMBOL)
             open_orders = [_to_existing_order(order) for order in raw_open_orders]
             target_orders = self._build_target_orders(target_intents, is_limit_breached=is_limit_breached)
