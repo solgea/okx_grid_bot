@@ -55,6 +55,7 @@ def rejected_intent():
 
 
 
+@pytest.mark.asyncio
 async def test_account_adapter_preserves_real_available_margin():
     from adapters.okx_adapter import OKXPreFlightAdapter
 
