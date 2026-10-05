@@ -106,8 +106,7 @@ class PreFlightValidator:
         if account.available_margin <= 0:
             self.state = self._reject(result, PF017_INSUFFICIENT_MARGIN, "No available margin.")
             return result
-        if intent.leverage > account.leverage:
-
+        if intent.leverage > account.leverage or intent.leverage > Decimal(str(self.policy.max_leverage)):
             self.state = self._reject(result, PF016_LEVERAGE_EXCEEDED, f"Intent leverage {intent.leverage} exceeds account leverage {account.leverage}.")
             return result
 
