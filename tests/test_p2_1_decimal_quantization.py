@@ -13,8 +13,8 @@ def test_grid_calculation_uses_decimal_values():
         price_precision=4,
     )
 
-    assert isinstance(engine.lower_price, Decimal)
-    assert isinstance(engine.upper_price, Decimal)
+    assert isinstance(engine._lower_price, Decimal)
+    assert isinstance(engine._upper_price, Decimal)
     assert isinstance(engine._grid_step, Decimal)
     assert all(isinstance(level, Decimal) for level in engine._grid_levels)
 
@@ -38,7 +38,7 @@ def test_non_finite_numeric_input_is_rejected():
 def test_price_quantization_is_deterministic():
     engine = GridEngine(100, 100.03, 4, 0.1, price_precision=2, min_step_pct=0.00001)
 
-    assert engine.grid_levels == [
+    assert engine._grid_levels == [
         Decimal("100.00"),
         Decimal("100.01"),
         Decimal("100.02"),
