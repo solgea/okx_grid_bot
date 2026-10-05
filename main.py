@@ -18,6 +18,7 @@ from config.settings import config
 
 # --- PREFLIGHT & ADAPTER IMPORTLARI ---
 from preflight_layer.validator import PreFlightValidator
+from preflight_layer.risk_policy import RiskPolicy
 from preflight_layer.order_manager import OrderManager
 from adapters.okx_adapter import OKXPreFlightAdapter
 from adapters.risk_adapter import RiskPreFlightAdapter
@@ -51,7 +52,8 @@ async def main():
     
     # 1. Çekirdek (Core) Motorların Başlatılması
     engine = OKXEngine()
-    risk = RiskManager()
+    risk_policy = RiskPolicy.from_config()
+    risk = RiskManager(policy=risk_policy)
     smc = SMCVolumeEngine()
     grid = GridEngine(
         lower_price=config.LOWER_PRICE,
@@ -65,10 +67,10 @@ async def main():
 
     # 2. PreFlight (Uçuş Öncesi) Adaptörlerinin Kurulumu
     exchange_adapter = OKXPreFlightAdapter(engine)
-    risk_adapter = RiskPreFlightAdapter(risk)
+    risk_adapter = RiskPreFlightAdapter(risk, policy=risk_policy)
     
     # 3. Validator ve Order Manager'ın Bağlanması
-    validator = PreFlightValidator(risk_manager=risk_adapter)
+    validator = PreFlightValidator(risk_manager=risk_adapter, policy=risk_policy)
     order_manager = OrderManager(adapter=exchange_adapter, validator=validator)
     
     # 4. Senkronizasyon Motoru

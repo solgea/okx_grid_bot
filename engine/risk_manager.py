@@ -4,6 +4,7 @@ import logging
 from enum import Enum
 
 from config.settings import config
+from preflight_layer.risk_policy import RiskPolicy
 
 logger = logging.getLogger("RiskManager")
 RISK_STATE_VERSION = 1
@@ -16,7 +17,8 @@ class RiskRegime(Enum):
 
 
 class RiskManager:
-    def __init__(self):
+    def __init__(self, policy: RiskPolicy | None = None):
+        self.policy = policy or RiskPolicy.from_config()
         self.initial_balance = 0.0
         self.peak_balance = 0.0
         self.daily_starting_balance = 0.0
@@ -181,15 +183,15 @@ class RiskManager:
         )
         daily_loss = self.daily_starting_balance - current_balance
 
-        if drawdown_pct >= config.MAX_DRAWDOWN_PCT or daily_loss >= config.MAX_DAILY_LOSS_USDT:
+        if drawdown_pct >= self.policy.max_drawdown_pct or daily_loss >= self.policy.max_daily_loss_usdt:
             self.kill_switch_triggered = True
             self._state_dirty = True
             return True
 
-        if abs(current_position_size) > config.MAX_POSITION_SIZE:
+        if abs(current_position_size) > self.policy.max_position_size:
             logger.critical(
                 "Hard position limit breached: %s > %s",
-                abs(current_position_size), config.MAX_POSITION_SIZE,
+                abs(current_position_size), self.policy.max_position_size,
             )
             return True
         return False

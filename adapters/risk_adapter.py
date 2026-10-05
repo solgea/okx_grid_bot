@@ -3,13 +3,14 @@ from decimal import Decimal
 from preflight_layer.interfaces import IRiskManager
 from engine.risk_manager import RiskManager
 from config.settings import config
+from preflight_layer.risk_policy import RiskPolicy
 
 logger = logging.getLogger("RiskPreFlightAdapter")
 
 class RiskPreFlightAdapter(IRiskManager):
-    def __init__(self, risk_manager: RiskManager):
-        """Mevcut RiskManager örneğini adaptöre enjekte ediyoruz."""
+    def __init__(self, risk_manager: RiskManager, policy: RiskPolicy | None = None):
         self.rm = risk_manager
+        self.policy = policy or risk_manager.policy
 
     def is_kill_switch_active(self) -> bool:
         """Drawdown veya günlük kayıp limitleri aşıldıysa emri doğrudan reddeder."""
@@ -28,22 +29,20 @@ class RiskPreFlightAdapter(IRiskManager):
         2. Dinamik risk rejimi sermayesinin aşılıp aşılmadığını denetler (Safe Haven koruması).
         """
         # 1. Statik Config Limiti (Miktar bazlı)
-        if hasattr(config, 'MAX_POSITION_SIZE'):
-            max_limit = Decimal(str(config.MAX_POSITION_SIZE))
-            
-            if intent.size > max_limit:
-                logger.error(
-                    f"❌ PreFlight REDDİ: Emir boyutu ({intent.size}) "
-                    f"maksimum statik pozisyon limitini ({max_limit}) aşıyor!"
-                )
-                return False
+        max_limit = Decimal(str(self.policy.max_position_size))
+        if intent.size > max_limit:
+            logger.error(
+                f"❌ PreFlight REDDİ: Emir boyutu ({intent.size}) "
+                f"maksimum statik pozisyon limitini ({max_limit}) aşıyor!"
+            )
+            return False
                 
         # 2. Projected post-order exposure: current position + open orders + proposal.
         current_exposure = abs(Decimal(str(getattr(account, "current_position_size", 0))))
         open_order_exposure = abs(Decimal(str(getattr(account, "open_order_exposure", 0))))
         proposed_exposure = Decimal("0") if getattr(intent, "reduce_only", False) else abs(intent.size)
         projected_exposure = current_exposure + open_order_exposure + proposed_exposure
-        max_exposure = Decimal(str(config.MAX_POSITION_SIZE))
+        max_exposure = Decimal(str(self.policy.max_position_size))
 
         if projected_exposure > max_exposure:
             logger.error(
