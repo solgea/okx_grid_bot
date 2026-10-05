@@ -85,7 +85,7 @@ class RiskPreFlightAdapter(IRiskManager):
             
         is_maker = getattr(intent, 'is_maker', True) # Grid limit emirleri varsayılan olarak maker'dır
         
-        return self.rm.check_trade_viability(entry_price, target_price, is_maker)
+        return self.rm.check_trade_viability(entry_price, float(target_price), is_maker)
 
     def validate_risk(self, account, intent) -> bool:
         """
