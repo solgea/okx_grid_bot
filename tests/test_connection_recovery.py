@@ -1,4 +1,5 @@
 import asyncio
+from decimal import Decimal
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -6,8 +7,7 @@ from ccxt.base.errors import NetworkError
 
 from engine.exchange import OKXEngine
 from engine.sync_engine import OrderSyncEngine
-from preflight_layer.domain import OrderIntent, OrderSide, OrderType
-from decimal import Decimal
+from preflight_layer.domain import ExecutionAuthorization, OrderIntent, OrderSide, OrderType
 
 
 @pytest.mark.asyncio
@@ -42,7 +42,6 @@ async def test_sync_does_not_cancel_orders_when_snapshot_fails():
         price=Decimal("2500"),
         size=Decimal("0.01"),
     )
-    from preflight_layer.domain import ExecutionAuthorization
     authorization = ExecutionAuthorization.from_authorized_intents([intent])
 
     with pytest.raises(NetworkError):
