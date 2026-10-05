@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, InvalidOperation
 from enum import Enum
 import uuid
 from config.settings import config
@@ -18,6 +18,30 @@ class GridState(str, Enum):
 
 
 class GridEngine:
+    """Deterministic grid calculations using Decimal arithmetic."""
+
+    @staticmethod
+    def _decimal(value) -> Decimal:
+        try:
+            value = Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid numeric value: {value!r}") from exc
+        if not value.is_finite():
+            raise ValueError(f"Numeric value must be finite: {value!r}")
+        return value
+
+    def _price_quantum(self) -> Decimal:
+        if self.price_precision < 0:
+            raise ValueError("price_precision must be non-negative")
+        return Decimal("1").scaleb(-self.price_precision)
+
+    def _quantize_price(self, value: Decimal) -> Decimal:
+        return value.quantize(self._price_quantum(), rounding=ROUND_DOWN)
+
+    @staticmethod
+    def _quantize_size(value: Decimal) -> Decimal:
+        return value.quantize(Decimal("0.00000001"), rounding=ROUND_DOWN).normalize()
+
     def __init__(self, lower_price: float, upper_price: float, grid_count: int, contract_size: float, 
                  price_precision: int = 2, oob_min_width_pct: float = 0.0, oob_buffer_pct: float = 0.0,
                  min_step_pct: float = 0.0020, tp_margin_pct: float = 0.0025):
@@ -25,21 +49,19 @@ class GridEngine:
         Matematiksel Grid Engine - Borsadan (OKX, vs) tamamen izole edilmiştir.
         Komisyon Korumalı (Fee-Protected) Sürüm.
         """
-        self.lower_price = float(lower_price)
-        self.upper_price = float(upper_price)
+        self.lower_price = self._decimal(lower_price)
+        self.upper_price = self._decimal(upper_price)
         self.grid_count = max(2, int(grid_count))
-        self.contract_size = float(contract_size)
-        self.price_precision = price_precision
-        
-        self.oob_min_width_pct = oob_min_width_pct
-        self.oob_buffer_pct = oob_buffer_pct
-        
-        # Komisyon kalkanı parametreleri
-        self.min_step_pct = min_step_pct       # İki grid arası minimum %0.20 mesafe (Komisyonu aşmak için)
-        self.tp_margin_pct = tp_margin_pct     # Giriş fiyatından en az %0.25 uzakta kâr al (Net kâr için)
-        
-        self.grid_step = 0.0
-        self.grid_levels = []
+        self.contract_size = self._decimal(contract_size)
+        self.price_precision = int(price_precision)
+
+        self.oob_min_width_pct = self._decimal(oob_min_width_pct)
+        self.oob_buffer_pct = self._decimal(oob_buffer_pct)
+        self.min_step_pct = self._decimal(min_step_pct)
+        self.tp_margin_pct = self._decimal(tp_margin_pct)
+
+        self.grid_step = Decimal("0")
+        self.grid_levels: list[Decimal] = []
         self.state = GridState.INITIALIZING
         self.previous_state = None
         self.state_reason = "Grid hesaplanıyor"
@@ -57,15 +79,15 @@ class GridEngine:
 
     def to_state(self) -> dict:
         return {
-            "lower_price": self.lower_price,
-            "upper_price": self.upper_price,
+            "lower_price": float(self.lower_price),
+            "upper_price": float(self.upper_price),
             "grid_count": self.grid_count,
-            "contract_size": self.contract_size,
+            "contract_size": float(self.contract_size),
             "price_precision": self.price_precision,
-            "oob_min_width_pct": self.oob_min_width_pct,
-            "oob_buffer_pct": self.oob_buffer_pct,
-            "min_step_pct": self.min_step_pct,
-            "tp_margin_pct": self.tp_margin_pct,
+            "oob_min_width_pct": float(self.oob_min_width_pct),
+            "oob_buffer_pct": float(self.oob_buffer_pct),
+            "min_step_pct": float(self.min_step_pct),
+            "tp_margin_pct": float(self.tp_margin_pct),
             "state": self.state.value,
             "previous_state": self.previous_state.value if self.previous_state else None,
             "state_reason": self.state_reason,
@@ -78,7 +100,7 @@ class GridEngine:
             "oob_buffer_pct", "min_step_pct", "tp_margin_pct",
         ):
             if name in state:
-                setattr(self, name, float(state[name]))
+                setattr(self, name, self._decimal(state[name]))
         if "price_precision" in state:
             self.price_precision = int(state["price_precision"])
         if "grid_count" in state:
@@ -123,41 +145,41 @@ class GridEngine:
         return self.state
 
     def _calculate_grid(self):
-        """Alt ve üst sınırlara göre grid adımlarını hesaplar (Komisyon Korumalı)."""
-        # 3. Test: Hatalı fiyat aralığı (lower >= upper) koruması
+        """Calculate grid levels with deterministic Decimal arithmetic."""
         if self.lower_price >= self.upper_price:
-            self.grid_step = 0.0
-            self.grid_levels = [round(self.lower_price, self.price_precision)] * self.grid_count
+            self.grid_step = Decimal("0")
+            level = self._quantize_price(self.lower_price)
+            self.grid_levels = [level] * self.grid_count
             return
-            
-        # --- KOMİSYON KORUMASI ---
+
         min_required_step = self.lower_price * self.min_step_pct
-        raw_step = (self.upper_price - self.lower_price) / (self.grid_count - 1)
-        
+        raw_step = (self.upper_price - self.lower_price) / Decimal(self.grid_count - 1)
+
         if raw_step < min_required_step:
-            # Hesaplanan aralık komisyonu kurtarmıyorsa, step'i minimuma sabitleyip grid sayısını azaltıyoruz
             self.grid_step = min_required_step
-            self.grid_count = max(2, int((self.upper_price - self.lower_price) / self.grid_step) + 1)
+            self.grid_count = max(
+                2,
+                int((self.upper_price - self.lower_price) / self.grid_step) + 1,
+            )
         else:
             self.grid_step = raw_step
-            
-        self.grid_levels = []
-        
-        for i in range(self.grid_count):
-            lvl = self.lower_price + (i * self.grid_step)
-            # 4. Test: Precision sorunlarını çözmek için yuvarlama
-            self.grid_levels.append(round(lvl, self.price_precision))
+
+        self.grid_levels = [
+            self._quantize_price(self.lower_price + (Decimal(i) * self.grid_step))
+            for i in range(self.grid_count)
+        ]
 
     def update_dynamic_grid_with_atr(self, atr_value: float, multiplier: float, current_price: float):
-        """Volatiliteye (ATR) dayalı dinamik ızgara güncellemesi."""
-        # 5, 6, 7, 8. Testler: Negatif veya sıfır değer koruması
-        if atr_value <= 0 or multiplier <= 0:
+        """Update the grid around current price using Decimal arithmetic."""
+        atr = self._decimal(atr_value)
+        mult = self._decimal(multiplier)
+        price = self._decimal(current_price)
+        if atr <= 0 or mult <= 0:
             return
-            
-        half_range = atr_value * multiplier
-        self.lower_price = current_price - half_range
-        self.upper_price = current_price + half_range
-        
+
+        half_range = atr * mult
+        self.lower_price = price - half_range
+        self.upper_price = price + half_range
         self._calculate_grid()
 
     def update_grid_from_smc(self, smc_data: dict, current_price: float):
@@ -174,8 +196,8 @@ class GridEngine:
         if val is None or vah is None or val >= vah:
             return
             
-        lower_bound = val
-        upper_bound = vah
+        lower_bound = self._decimal(val)
+        upper_bound = self._decimal(vah)
         
         obs = smc_data.get('order_blocks', {})
         bull_ob = obs.get('bullish_ob')
@@ -183,42 +205,48 @@ class GridEngine:
         
         # 15. Test: Çelişkili (Reversed) Order Blocks verilerinde Fallback
         if bull_ob is not None and bear_ob is not None:
-            if bull_ob < bear_ob:
-                lower_bound = bull_ob
-                upper_bound = bear_ob
+            bull = self._decimal(bull_ob)
+            bear = self._decimal(bear_ob)
+            if bull < bear:
+                lower_bound = bull
+                upper_bound = bear
 
         fvg = smc_data.get("fvg")
-        if isinstance(fvg, dict) and fvg.get("lower") < fvg.get("upper"):
-            if fvg.get("direction") == "bullish":
-                lower_bound = min(lower_bound, fvg["lower"])
-            elif fvg.get("direction") == "bearish":
-                upper_bound = max(upper_bound, fvg["upper"])
+        if isinstance(fvg, dict) and fvg.get("lower") is not None and fvg.get("upper") is not None:
+            fvg_lower = self._decimal(fvg["lower"])
+            fvg_upper = self._decimal(fvg["upper"])
+            if fvg_lower < fvg_upper:
+                if fvg.get("direction") == "bullish":
+                    lower_bound = min(lower_bound, fvg_lower)
+                elif fvg.get("direction") == "bearish":
+                    upper_bound = max(upper_bound, fvg_upper)
 
+        current_price_dec = self._decimal(current_price)
         mss = smc_data.get("mss")
         if mss == "bullish":
-            lower_bound = min(lower_bound, current_price)
+            lower_bound = min(lower_bound, current_price_dec)
         elif mss == "bearish":
-            upper_bound = max(upper_bound, current_price)
+            upper_bound = max(upper_bound, current_price_dec)
 
         score = smc_data.get("confluence_score")
         if score is not None:
             self.confluence_score = max(0, min(100, int(score)))
             if self.confluence_score > 80:
-                center = float(smc_data.get("ote", current_price))
-                width = (upper_bound - lower_bound) * 0.6
-                lower_bound = max(lower_bound, center - width / 2)
-                upper_bound = min(upper_bound, center + width / 2)
+                center = self._decimal(smc_data.get("ote", current_price))
+                width = (upper_bound - lower_bound) * Decimal("0.6")
+                lower_bound = max(lower_bound, center - width / Decimal("2"))
+                upper_bound = min(upper_bound, center + width / Decimal("2"))
                 
         # 16 & 18. Testler: OOB (Sınır Dışı) ve Dar Aralık Kalkanları
         current_width = upper_bound - lower_bound
-        min_width = current_price * self.oob_min_width_pct
-        
-        is_oob = current_price < lower_bound or current_price > upper_bound
-        
+        min_width = current_price_dec * self.oob_min_width_pct
+
+        is_oob = current_price_dec < lower_bound or current_price_dec > upper_bound
+
         if is_oob:
             target_width = max(current_width, min_width)
-            lower_bound = current_price - (target_width / 2)
-            upper_bound = current_price + (target_width / 2)
+            lower_bound = current_price_dec - (target_width / Decimal("2"))
+            upper_bound = current_price_dec + (target_width / Decimal("2"))
         else:
             if current_width < min_width:
                 upper_bound = lower_bound + min_width
@@ -232,22 +260,25 @@ class GridEngine:
         Hedef grid emirlerini hesaplar ve PreFlight (Domain) 
         standartlarında OrderIntent nesneleri üretir.
         """
-        self.update_state(current_price, current_position_size, entry_price, confluence_score)
+        current_price_dec = self._decimal(current_price)
+        position_size_dec = self._decimal(current_position_size)
+        entry_price_dec = self._decimal(entry_price)
+        self.update_state(current_price_dec, position_size_dec, entry_price_dec, confluence_score)
         if self.state == GridState.RISK_OFF:
             return []
         
         intents = []
         
-        pos_dec = Decimal(str(current_position_size))
-        contract_dec = Decimal(str(self.contract_size))
-        entry_dec = Decimal(str(entry_price))
-        
+        pos_dec = position_size_dec
+        contract_dec = self.contract_size
+        entry_dec = entry_price_dec
+        spread_tolerance = self._price_quantum()
+
         for lvl in self.grid_levels:
-            # 9. Test: Fiyat tam şu anki grid seviyesindeyse (Spread koruması) atla
-            if abs(lvl - current_price) < 0.0001:
+            if abs(lvl - current_price_dec) < spread_tolerance:
                 continue
-                
-            side_str = "buy" if lvl < current_price else "sell"
+
+            side_str = "buy" if lvl < current_price_dec else "sell"
             amount_dec = contract_dec
             is_take_profit = False # Varsayılan olarak kademe açılışı (Add) kabul et
             
@@ -255,7 +286,7 @@ class GridEngine:
             if entry_dec > 0 and pos_dec != 0:
                 if side_str == "sell" and pos_dec > 0:
                     is_take_profit = True
-                    min_tp = float(entry_dec) * (1 + self.tp_margin_pct)
+                    min_tp = entry_dec * (Decimal("1") + self.tp_margin_pct)
                     if lvl >= min_tp:
                         alloc = min(pos_dec, contract_dec)
                         amount_dec = alloc
@@ -265,13 +296,13 @@ class GridEngine:
                         
                 elif side_str == "buy" and pos_dec < 0:
                     is_take_profit = True
-                    min_tp = float(entry_dec) * (1 - self.tp_margin_pct)
+                    min_tp = entry_dec * (Decimal("1") - self.tp_margin_pct)
                     if lvl <= min_tp:
                         alloc = min(abs(pos_dec), contract_dec)
                         amount_dec = alloc
                         pos_dec += alloc
             if amount_dec > 0:
-                final_amount = amount_dec.quantize(Decimal('0.00000001'), rounding=ROUND_DOWN).normalize()
+                final_amount = self._quantize_size(amount_dec)
                 intent = OrderIntent(
                     instrument_id=instrument_id,
                     side=OrderSide.BUY if side_str == "buy" else OrderSide.SELL,
@@ -285,7 +316,7 @@ class GridEngine:
                     client_order_id=f"grid_{uuid.uuid4().hex[:6]}"
                 )
                 if is_take_profit:
-                    intent.expected_target_price = float(entry_dec)
+                    intent.expected_target_price = entry_dec
                 else:
                     if side_str == "buy":
                         intent.expected_target_price = lvl + self.grid_step
