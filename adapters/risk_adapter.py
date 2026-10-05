@@ -38,11 +38,25 @@ class RiskPreFlightAdapter(IRiskManager):
                 )
                 return False
                 
-        # 2. Dinamik Rejim Sermayesi Limiti (USDT bazlı)
-        # Rejimin (Aggressive/Defensive/Preservation) izin verdiği maksimum sermaye
+        # 2. Projected post-order exposure: current position + open orders + proposal.
+        current_exposure = abs(Decimal(str(getattr(account, "current_position_size", 0))))
+        open_order_exposure = abs(Decimal(str(getattr(account, "open_order_exposure", 0))))
+        proposed_exposure = Decimal("0") if getattr(intent, "reduce_only", False) else abs(intent.size)
+        projected_exposure = current_exposure + open_order_exposure + proposed_exposure
+        max_exposure = Decimal(str(config.MAX_POSITION_SIZE))
+
+        if projected_exposure > max_exposure:
+            logger.error(
+                "❌ PreFlight REDDİ: projected exposure (%s) exceeds max exposure (%s).",
+                projected_exposure,
+                max_exposure,
+            )
+            return False
+
+        # 3. Dinamik Rejim Sermayesi Limiti (USDT bazlı).
         allowed_capital = Decimal(str(self.rm.get_allowed_position_size()))
-        estimated_cost = intent.size * intent.price  # USDT cinsinden maliyet
-        
+        estimated_cost = intent.size * intent.price
+
         if estimated_cost > allowed_capital:
             logger.error(
                 f"❌ PreFlight REDDİ: Emir maliyeti ({estimated_cost:.2f} USDT), "
