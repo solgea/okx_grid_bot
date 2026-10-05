@@ -3,6 +3,7 @@ import time
 from decimal import Decimal, InvalidOperation
 
 from config.settings import config
+from preflight_layer.risk_policy import RiskPolicy
 from preflight_layer.domain import (
     OrderIntent, InstrumentMetadata, AccountState, MarketData,
     PreFlightState, ValidationResult, ValidationCheck,
@@ -27,8 +28,9 @@ def _aligned(value: Decimal, step: Decimal) -> bool:
 
 
 class PreFlightValidator:
-    def __init__(self, risk_manager=None):
+    def __init__(self, risk_manager=None, policy: RiskPolicy | None = None):
         self.risk_manager = risk_manager
+        self.policy = policy or RiskPolicy.from_config()
         self.state = PreFlightState.CREATED
 
     @staticmethod
@@ -85,7 +87,7 @@ class PreFlightValidator:
         if intent.size < metadata.min_size:
             self.state = self._reject(result, PF010_QUANTITY_BELOW_MIN, f"Order size {intent.size} is below minimum {metadata.min_size}.")
             return result
-        max_size = Decimal(str(config.MAX_POSITION_SIZE))
+        max_size = Decimal(str(self.policy.max_position_size))
         if intent.size > max_size:
             self.state = self._reject(result, PF018_MAX_SIZE_EXCEEDED, f"Order size {intent.size} exceeds maximum {max_size}.")
             return result
@@ -105,6 +107,7 @@ class PreFlightValidator:
             self.state = self._reject(result, PF017_INSUFFICIENT_MARGIN, "No available margin.")
             return result
         if intent.leverage > account.leverage:
+
             self.state = self._reject(result, PF016_LEVERAGE_EXCEEDED, f"Intent leverage {intent.leverage} exceeds account leverage {account.leverage}.")
             return result
 
@@ -114,7 +117,7 @@ class PreFlightValidator:
             self.state = self._reject(result, PF026_MARKET_DATA_UNAVAILABLE, "Market data unavailable.")
             return result
         age = time.time() - market.timestamp
-        if age < 0 or age > config.MARKET_DATA_MAX_AGE_SEC:
+        if age < 0 or age > self.policy.market_data_max_age_sec:
             self.state = self._reject(result, PF025_STALE_MARKET_DATA, f"Market data is stale ({age:.1f}s).")
             return result
 
