@@ -1,5 +1,6 @@
 from decimal import Decimal
 import time
+import pytest
 
 from adapters.risk_adapter import RiskPreFlightAdapter
 from engine.risk_manager import RiskManager
@@ -64,7 +65,8 @@ def test_inverse_swap_notional_uses_contract_value_over_price():
     assert value == Decimal("100") / Decimal("60000")
 
 
-def test_preflight_rejects_margin_using_contract_notional():
+def test_preflight_rejects_margin_using_contract_notional(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator()
     # 100 contracts × 0.01 BTC × 60,000 / 2 = 15,000 USDT margin.
     result = validator.validate(intent(size="100"), metadata(), account("1000"), MarketData(
@@ -74,7 +76,8 @@ def test_preflight_rejects_margin_using_contract_notional():
     assert result.rejection_code == "PF017_INSUFFICIENT_MARGIN"
 
 
-def test_preflight_accepts_margin_when_contract_value_is_accounted_for():
+def test_preflight_accepts_margin_when_contract_value_is_accounted_for(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator()
     # 1 contract × 0.01 BTC × 60,000 / 2 = 300 USDT margin.
     result = validator.validate(intent(size="1"), metadata(), account("500"), MarketData(
@@ -83,7 +86,8 @@ def test_preflight_accepts_margin_when_contract_value_is_accounted_for():
     assert result.passed is True
 
 
-def test_missing_contract_value_fails_closed():
+def test_missing_contract_value_fails_closed(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator()
     result = validator.validate(intent(), metadata("0"), account(), MarketData(
         last=Decimal("60000"), timestamp=time.time()
