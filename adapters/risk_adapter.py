@@ -8,9 +8,9 @@ from preflight_layer.risk_policy import RiskPolicy
 logger = logging.getLogger("RiskPreFlightAdapter")
 
 class RiskPreFlightAdapter(IRiskManager):
-    def __init__(self, risk_manager: RiskManager):
-        """Mevcut RiskManager örneğini adaptöre enjekte ediyoruz."""
+    def __init__(self, risk_manager: RiskManager, policy: RiskPolicy | None = None):
         self.rm = risk_manager
+        self.policy = policy or risk_manager.policy
 
     def is_kill_switch_active(self) -> bool:
         """Drawdown veya günlük kayıp limitleri aşıldıysa emri doğrudan reddeder."""
@@ -42,7 +42,7 @@ class RiskPreFlightAdapter(IRiskManager):
         open_order_exposure = abs(Decimal(str(getattr(account, "open_order_exposure", 0))))
         proposed_exposure = Decimal("0") if getattr(intent, "reduce_only", False) else abs(intent.size)
         projected_exposure = current_exposure + open_order_exposure + proposed_exposure
-        max_exposure = Decimal(str(config.MAX_POSITION_SIZE))
+        max_exposure = Decimal(str(self.policy.max_position_size))
 
         if projected_exposure > max_exposure:
             logger.error(
