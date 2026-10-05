@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     DRY_RUN: bool = True
     LIVE_TRADING_ENABLED: bool = False
     LIVE_TRADING_AUTHORIZED: bool = False
+    EMERGENCY_FLATTEN_ENABLED: bool = False
+    EMERGENCY_FLATTEN_AUTHORIZED: bool = False
 
     SYMBOL: str = CCXT_SYMBOL
     LEVERAGE: int = 10
