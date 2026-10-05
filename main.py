@@ -40,6 +40,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MainLoop")
 
+def emergency_flatten_authorized(position_size: float) -> bool:
+    return (
+        abs(position_size) > 0
+        and config.EMERGENCY_FLATTEN_ENABLED
+        and config.EMERGENCY_FLATTEN_AUTHORIZED
+    )
+
+
 async def write_csv_async(log_file: str, row_data: list):
     """Event loop'u kitlemeden dosyaya asenkron satır ekler."""
     line = ",".join(map(str, row_data)) + "\n"
@@ -225,11 +233,7 @@ async def main():
                     logger.critical("🛑 RİSK LİMİTİ AŞILDI! ACİL DURUM PROTOKOLÜ (KILL-SWITCH) AKTİF!")
                     try:
                         await engine.cancel_all_orders(config.SYMBOL)
-                        if (
-                            abs(current_position_size) > 0
-                            and config.EMERGENCY_FLATTEN_ENABLED
-                            and config.EMERGENCY_FLATTEN_AUTHORIZED
-                        ):
+                        if emergency_flatten_authorized(current_position_size):
                             await engine.close_position_market(config.SYMBOL)
                             logger.critical(
                                 f"💥 [{config.SYMBOL}] {current_position_size} büyüklüğündeki pozisyon "
