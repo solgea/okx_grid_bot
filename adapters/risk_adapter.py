@@ -29,15 +29,13 @@ class RiskPreFlightAdapter(IRiskManager):
         2. Dinamik risk rejimi sermayesinin aşılıp aşılmadığını denetler (Safe Haven koruması).
         """
         # 1. Statik Config Limiti (Miktar bazlı)
-        if hasattr(config, 'MAX_POSITION_SIZE'):
-            max_limit = Decimal(str(self.policy.max_position_size))
-            
-            if intent.size > max_limit:
-                logger.error(
-                    f"❌ PreFlight REDDİ: Emir boyutu ({intent.size}) "
-                    f"maksimum statik pozisyon limitini ({max_limit}) aşıyor!"
-                )
-                return False
+        max_limit = Decimal(str(self.policy.max_position_size))
+        if intent.size > max_limit:
+            logger.error(
+                f"❌ PreFlight REDDİ: Emir boyutu ({intent.size}) "
+                f"maksimum statik pozisyon limitini ({max_limit}) aşıyor!"
+            )
+            return False
                 
         # 2. Projected post-order exposure: current position + open orders + proposal.
         current_exposure = abs(Decimal(str(getattr(account, "current_position_size", 0))))
