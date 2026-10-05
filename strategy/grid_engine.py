@@ -172,7 +172,7 @@ class GridEngine:
             self._grid_levels = [level] * self.grid_count
             return
 
-        min_required_step = self.lower_price * self.min_step_pct
+        min_required_step = self._lower_price * self.min_step_pct
         raw_step = (self._upper_price - self._lower_price) / Decimal(self.grid_count - 1)
 
         if raw_step < min_required_step:
