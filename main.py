@@ -225,11 +225,23 @@ async def main():
                     logger.critical("🛑 RİSK LİMİTİ AŞILDI! ACİL DURUM PROTOKOLÜ (KILL-SWITCH) AKTİF!")
                     try:
                         await engine.cancel_all_orders(config.SYMBOL)
-                        if abs(current_position_size) > 0:
+                        if (
+                            abs(current_position_size) > 0
+                            and config.EMERGENCY_FLATTEN_ENABLED
+                            and config.EMERGENCY_FLATTEN_AUTHORIZED
+                        ):
                             await engine.close_position_market(config.SYMBOL)
-                            logger.critical(f"💥 [{config.SYMBOL}] {current_position_size} büyüklüğündeki pozisyon marketten KAPATILDI.")
+                            logger.critical(
+                                f"💥 [{config.SYMBOL}] {current_position_size} büyüklüğündeki pozisyon "
+                                "EMERGENCY_FLATTEN ile marketten KAPATILDI."
+                            )
+                        elif abs(current_position_size) > 0:
+                            logger.critical(
+                                "⚠️ KILL_SWITCH yalnızca yeni emirleri durdurdu ve açık emirleri iptal etti; "
+                                "EMERGENCY_FLATTEN ayrı yetkilendirilmedi."
+                            )
                         else:
-                            logger.critical("ℹ️ Kapatılacak açık pozisyon bulunmuyor, sadece emirler temizlendi.")
+                            logger.critical("ℹ️ Kapatılacak açık pozisyon bulunmuyor, emirler temizlendi.")
                     except Exception as panic_err:
                         logger.error(f"🚨 KILL-SWITCH UYGULANIRKEN HATA: {panic_err}")
                     finally:
