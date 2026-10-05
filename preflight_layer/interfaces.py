@@ -27,7 +27,7 @@ class IRiskManager(ABC):
     """Canonical risk adapter contract used by PreFlightValidator."""
 
     @abstractmethod
-    def validate_risk(self, account: AccountState, intent: OrderIntent) -> bool:
+    def validate_risk(self, account: AccountState, intent: OrderIntent, metadata: InstrumentMetadata | None = None) -> bool:
         raise NotImplementedError
 
 

@@ -2,7 +2,19 @@ from decimal import Decimal
 
 from adapters.risk_adapter import RiskPreFlightAdapter
 from engine.risk_manager import RiskManager
-from preflight_layer.domain import AccountState, OrderIntent, OrderSide, OrderType
+from preflight_layer.domain import AccountState, InstrumentMetadata, OrderIntent, OrderSide, OrderType
+
+
+def make_metadata():
+    return InstrumentMetadata(
+        symbol="ETH/USDT:USDT",
+        min_size=Decimal("0.01"),
+        tick_size=Decimal("0.01"),
+        lot_size=Decimal("0.01"),
+        contract_val=Decimal("1"),
+        contract_type="linear",
+        is_live=True,
+    )
 
 
 def make_intent(reduce_only=False):
@@ -30,7 +42,7 @@ def test_projected_exposure_includes_position_and_open_orders():
         open_order_exposure=Decimal("0.02"),
     )
 
-    assert adapter.validate_position_limits(account, make_intent()) is False
+    assert adapter.validate_position_limits(account, make_intent(), make_metadata()) is False
 
 
 def test_reduce_only_order_does_not_add_proposed_exposure():
@@ -46,4 +58,4 @@ def test_reduce_only_order_does_not_add_proposed_exposure():
         open_order_exposure=Decimal("0"),
     )
 
-    assert adapter.validate_position_limits(account, make_intent(reduce_only=True)) is True
+    assert adapter.validate_position_limits(account, make_intent(reduce_only=True), make_metadata()) is True

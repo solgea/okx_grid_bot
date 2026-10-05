@@ -23,7 +23,20 @@ class RiskPreFlightAdapter(IRiskManager):
         """
         return self.rm.kill_switch_triggered or self.rm.trading_halted
 
-    def validate_position_limits(self, account, intent) -> bool:
+    @staticmethod
+    def _contract_notional(intent, metadata) -> Decimal:
+        contracts = intent.size
+        price = intent.price
+        ct_val = metadata.contract_val
+        if contracts <= 0 or price <= 0 or ct_val <= 0:
+            raise ValueError("Invalid contract sizing inputs")
+        if metadata.contract_type.lower() == "linear":
+            return contracts * ct_val * price
+        if metadata.contract_type.lower() == "inverse":
+            return contracts * ct_val / price
+        raise ValueError(f"Unsupported contract type: {metadata.contract_type}")
+
+    def validate_position_limits(self, account, intent, metadata=None) -> bool:
         """
         1. Statik config limitini (MAX_POSITION_SIZE) denetler.
         2. Dinamik risk rejimi sermayesinin aşılıp aşılmadığını denetler (Safe Haven koruması).
@@ -52,9 +65,16 @@ class RiskPreFlightAdapter(IRiskManager):
             )
             return False
 
-        # 3. Dinamik Rejim Sermayesi Limiti (USDT bazlı).
+        # 3. Dinamik Rejim Sermayesi Limiti (quote-currency notional).
+        if metadata is None:
+            logger.error("❌ PreFlight REDDİ: contract metadata is required for capital sizing.")
+            return False
+        try:
+            estimated_cost = self._contract_notional(intent, metadata)
+        except ValueError as exc:
+            logger.error("❌ PreFlight REDDİ: %s", exc)
+            return False
         allowed_capital = Decimal(str(self.rm.get_allowed_position_size()))
-        estimated_cost = intent.size * intent.price
 
         if estimated_cost > allowed_capital:
             logger.error(
@@ -87,7 +107,7 @@ class RiskPreFlightAdapter(IRiskManager):
         
         return self.rm.check_trade_viability(entry_price, float(target_price), is_maker)
 
-    def validate_risk(self, account, intent) -> bool:
+    def validate_risk(self, account, intent, metadata=None) -> bool:
         """
         PreFlightValidator tarafından zorunlu olarak çağrılan ana risk denetimi.
         Tüm alt risk modüllerini (kill-switch, limitler, friction) birleştirir.
@@ -96,7 +116,7 @@ class RiskPreFlightAdapter(IRiskManager):
             logger.error("❌ PreFlight REDDİ: Sistem kill-switch aktif veya alım-satım durduruldu!")
             return False
             
-        if not self.validate_position_limits(account, intent):
+        if not self.validate_position_limits(account, intent, metadata):
             return False
             
         if not self.validate_friction(intent):

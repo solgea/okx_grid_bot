@@ -40,7 +40,9 @@ class InstrumentMetadata:
     min_size: Decimal = Decimal("0.01")
     tick_size: Decimal = Decimal("0.01")
     lot_size: Decimal = Decimal("0.01")
-    contract_val: Decimal = Decimal("1")
+    contract_val: Decimal = Decimal("0")
+    contract_val_ccy: str = ""
+    contract_type: str = "linear"
     is_live: bool = True
 
 @dataclass
