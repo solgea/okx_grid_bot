@@ -12,6 +12,7 @@ from enum import Enum
 from config.settings import config
 from strategy.order_reconciler import ExistingOrder, GridOrderSpec, OrderReconciler
 from preflight_layer.domain import ExecutionAuthorization
+from demo_exec.transport import OkxDemoTransport
 
 logger = logging.getLogger("OrderSyncEngine")
 _BATCH_SIZE = 20
@@ -202,9 +203,16 @@ class OrderSyncEngine:
 
     async def _place_single_order(self, spec: Any) -> Any:
         try:
-            return await self.engine.exchange.create_order(
-                symbol=config.SYMBOL, type="limit", side=spec.side,
-                amount=float(spec.size), price=float(spec.price),
+            transport = OkxDemoTransport(
+                self.engine.exchange,
+                demo_phase="B",
+                is_demo=config.IS_DEMO,
+            )
+            return await transport.place_spec(
+                symbol=config.SYMBOL,
+                side=spec.side,
+                amount=float(spec.size),
+                price=float(spec.price),
                 params=self._order_params(spec),
             )
         except Exception as exc:
