@@ -1,5 +1,5 @@
 import logging
-from preflight_layer.domain import OrderIntent, PreFlightState
+from preflight_layer.domain import OrderIntent, PreFlightState, ExecutionAuthorization
 
 # IExchangeAdapter eğer interfaces içinde yoksa duck-typing ile geçilebilir, 
 # varsa bu satırı aktif bırakabilirsin.
@@ -14,8 +14,8 @@ class OrderManager:
         self.adapter = adapter
         self.validator = validator
 
-    def validate_intents(self, intents, metadata, account, market):
-        """Validate a batch against one exchange snapshot before synchronization."""
+    def authorize_intents(self, intents, metadata, account, market):
+        """Validate intents and issue a fail-closed execution authorization."""
         accepted, rejected = self.validator.validate_batch(
             intents, metadata, account, market
         )
@@ -25,6 +25,19 @@ class OrderManager:
                 intent.instrument_id,
                 result.rejection_code,
             )
+
+        authorization = ExecutionAuthorization.from_authorized_intents(accepted)
+        if rejected and not accepted:
+            first_rejection = rejected[0][1]
+            authorization = ExecutionAuthorization.rejected(
+                first_rejection.message or "All intents rejected by PreFlight.",
+                first_rejection.rejection_code,
+            )
+        return accepted, authorization
+
+    def validate_intents(self, intents, metadata, account, market):
+        """Backward-compatible validation helper; execution must use authorize_intents."""
+        accepted, _ = self.authorize_intents(intents, metadata, account, market)
         return accepted
 
     async def execute_intent(self, intent: OrderIntent) -> bool:
