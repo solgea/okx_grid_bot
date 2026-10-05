@@ -43,6 +43,16 @@ class GridEngine:
         return value.quantize(Decimal("0.00000001"), rounding=ROUND_DOWN).normalize()
 
     @property
+    def lower_price(self) -> float:
+        """Compatibility view; internal range arithmetic uses Decimal."""
+        return float(self._lower_price)
+
+    @property
+    def upper_price(self) -> float:
+        """Compatibility view; internal range arithmetic uses Decimal."""
+        return float(self._upper_price)
+
+    @property
     def grid_step(self) -> float:
         """Compatibility view; calculations use the private Decimal value."""
         return float(self._grid_step)
@@ -59,8 +69,8 @@ class GridEngine:
         Matematiksel Grid Engine - Borsadan (OKX, vs) tamamen izole edilmiştir.
         Komisyon Korumalı (Fee-Protected) Sürüm.
         """
-        self.lower_price = self._decimal(lower_price)
-        self.upper_price = self._decimal(upper_price)
+        self._lower_price = self._decimal(lower_price)
+        self._upper_price = self._decimal(upper_price)
         self.grid_count = max(2, int(grid_count))
         self.contract_size = self._decimal(contract_size)
         self.price_precision = int(price_precision)
@@ -110,7 +120,7 @@ class GridEngine:
             "oob_buffer_pct", "min_step_pct", "tp_margin_pct",
         ):
             if name in state:
-                setattr(self, name, self._decimal(state[name]))
+                setattr(self, f"_{name}", self._decimal(state[name]))
         if "price_precision" in state:
             self.price_precision = int(state["price_precision"])
         if "grid_count" in state:
