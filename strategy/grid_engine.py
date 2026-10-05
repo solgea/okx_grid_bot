@@ -99,8 +99,8 @@ class GridEngine:
 
     def to_state(self) -> dict:
         return {
-            "lower_price": float(self.lower_price),
-            "upper_price": float(self.upper_price),
+            "lower_price": float(self._lower_price),
+            "upper_price": float(self._upper_price),
             "grid_count": self.grid_count,
             "contract_size": float(self.contract_size),
             "price_precision": self.price_precision,
@@ -147,7 +147,7 @@ class GridEngine:
         """
         if confluence_score is not None:
             self.confluence_score = max(0, min(100, int(confluence_score)))
-        if current_price <= 0 or self.lower_price >= self.upper_price or not self._grid_levels:
+        if current_price <= 0 or self._lower_price >= self._upper_price or not self._grid_levels:
             self._transition(GridState.PAUSED, "Geçersiz fiyat veya grid aralığı")
         elif confluence_score is not None and self.confluence_score < 50:
             self._transition(GridState.RISK_OFF, "Kurumsal confluence skoru düşük")
@@ -166,26 +166,26 @@ class GridEngine:
 
     def _calculate_grid(self):
         """Calculate grid levels with deterministic Decimal arithmetic."""
-        if self.lower_price >= self.upper_price:
+        if self._lower_price >= self._upper_price:
             self._grid_step = Decimal("0")
-            level = self._quantize_price(self.lower_price)
+            level = self._quantize_price(self._lower_price)
             self._grid_levels = [level] * self.grid_count
             return
 
         min_required_step = self.lower_price * self.min_step_pct
-        raw_step = (self.upper_price - self.lower_price) / Decimal(self.grid_count - 1)
+        raw_step = (self._upper_price - self._lower_price) / Decimal(self.grid_count - 1)
 
         if raw_step < min_required_step:
             self._grid_step = min_required_step
             self.grid_count = max(
                 2,
-                int((self.upper_price - self.lower_price) / self._grid_step) + 1,
+                int((self._upper_price - self._lower_price) / self._grid_step) + 1,
             )
         else:
             self._grid_step = raw_step
 
         self._grid_levels = [
-            self._quantize_price(self.lower_price + (Decimal(i) * self._grid_step))
+            self._quantize_price(self._lower_price + (Decimal(i) * self._grid_step))
             for i in range(self.grid_count)
         ]
 
@@ -198,8 +198,8 @@ class GridEngine:
             return
 
         half_range = atr * mult
-        self.lower_price = price - half_range
-        self.upper_price = price + half_range
+        self._lower_price = price - half_range
+        self._upper_price = price + half_range
         self._calculate_grid()
 
     def update_grid_from_smc(self, smc_data: dict, current_price: float):
@@ -271,8 +271,8 @@ class GridEngine:
             if current_width < min_width:
                 upper_bound = lower_bound + min_width
                 
-        self.lower_price = lower_bound
-        self.upper_price = upper_bound
+        self._lower_price = lower_bound
+        self._upper_price = upper_bound
         self._calculate_grid()
 
     def get_target_orders(self, current_price: float, current_position_size: float, entry_price: float, instrument_id: str = config.SYMBOL, confluence_score: int | None = None) -> list:
