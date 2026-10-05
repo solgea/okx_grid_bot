@@ -101,7 +101,8 @@ def test_zero_balance_cannot_initialize_risk_manager():
     assert risk.trading_halted is True
 
 
-def test_invalid_contract_metadata_is_fail_closed():
+def test_invalid_contract_metadata_is_fail_closed(monkeypatch):
+    monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator()
     metadata = make_metadata()
     metadata.contract_val = Decimal("0")
@@ -117,9 +118,9 @@ def test_insufficient_contract_margin_is_rejected(monkeypatch):
     validator = PreFlightValidator()
 
     result = validator.validate(
-        make_intent(size="1"),
+        make_intent(size="0.1"),
         make_metadata(),
-        make_account(margin="1"),
+        make_account(margin="0.4"),
         make_market(),
     )
 
