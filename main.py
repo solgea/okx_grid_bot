@@ -133,7 +133,14 @@ async def main():
         
         initial_account = await exchange_adapter.fetch_account_state()
         initial_balance = float(initial_account.balance)
-        risk.initialize_balance(initial_balance)
+        restored_risk_state = await load_state("risk_state.json")
+        if restored_risk_state:
+            risk.restore_state(restored_risk_state, initial_balance)
+            logger.info("💾 Risk state cache'den doğrulanarak geri yüklendi.")
+        else:
+            risk.initialize_balance(initial_balance)
+            await save_state("risk_state.json", risk.export_state())
+            risk.mark_state_persisted()
         logger.info(f"💰 Başlangıç Cüzdan Bakiyesi Kaydedildi: {initial_balance:.2f} USDT")
         
         log_file = "trade_execution_log.csv"
@@ -227,6 +234,10 @@ async def main():
                         logger.critical("⛔ Sistem güvenliğe alındı. İşlem döngüsü sonlandırılıyor.")
                         break
 
+                if risk.state_dirty:
+                    await save_state("risk_state.json", risk.export_state())
+                    risk.mark_state_persisted()
+
                 # --- POZİSYON LİMİT KONTROLÜ (SOFT-LIMIT BARIYERİ) ---
                 # Pozisyon büyüklüğü azami kontrat/büyüklük sınırına ulaştıysa yeni giriş emri açılmasını engelliyoruz.
                 max_pos_limit = getattr(config, 'MAX_POSITION_SIZE', getattr(config, 'MAX_POS_SIZE', None))
@@ -314,6 +325,8 @@ async def main():
         if stream_task:
             stream_task.cancel()
             await asyncio.gather(stream_task, return_exceptions=True)
+        await save_state("risk_state.json", risk.export_state())
+        risk.mark_state_persisted()
         await save_state(
             "bot_state.json",
             {

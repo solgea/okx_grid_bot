@@ -1,9 +1,12 @@
+import hashlib
+import json
 import logging
 from enum import Enum
 
 from config.settings import config
 
 logger = logging.getLogger("RiskManager")
+RISK_STATE_VERSION = 1
 
 
 class RiskRegime(Enum):
@@ -22,13 +25,97 @@ class RiskManager:
         self.safe_haven = 0.0
         self.active_compounding_capital = 0.0
         self.current_regime = RiskRegime.AGGRESSIVE
+        self._state_dirty = False
         self.maker_fee = getattr(config, "MAKER_FEE_PCT", 0.0002)
         self.taker_fee = getattr(config, "TAKER_FEE_PCT", 0.0005)
         self.slippage_buffer = getattr(config, "SLIPPAGE_PCT", 0.0001)
 
     def halt_trading(self, reason: str):
         self.trading_halted = True
+        self._state_dirty = True
         logger.critical("Trading halted: %s", reason)
+
+    @property
+    def state_dirty(self) -> bool:
+        return self._state_dirty
+
+    def mark_state_persisted(self) -> None:
+        self._state_dirty = False
+
+    def export_state(self) -> dict:
+        state = {
+            "initial_balance": self.initial_balance,
+            "peak_balance": self.peak_balance,
+            "daily_starting_balance": self.daily_starting_balance,
+            "kill_switch_triggered": self.kill_switch_triggered,
+            "trading_halted": self.trading_halted,
+            "safe_haven": self.safe_haven,
+            "active_compounding_capital": self.active_compounding_capital,
+            "current_regime": self.current_regime.value,
+        }
+        encoded = json.dumps(state, sort_keys=True, separators=(",", ":")).encode()
+        return {
+            "version": RISK_STATE_VERSION,
+            "state": state,
+            "checksum": hashlib.sha256(encoded).hexdigest(),
+        }
+
+    def restore_state(self, envelope: dict, current_balance: float) -> None:
+        if not isinstance(envelope, dict) or envelope.get("version") != RISK_STATE_VERSION:
+            self.halt_trading("Risk state version is invalid")
+            raise ValueError("Risk state version is invalid")
+
+        state = envelope.get("state")
+        checksum = envelope.get("checksum")
+        if not isinstance(state, dict) or not isinstance(checksum, str):
+            self.halt_trading("Risk state structure is invalid")
+            raise ValueError("Risk state structure is invalid")
+
+        encoded = json.dumps(state, sort_keys=True, separators=(",", ":")).encode()
+        if hashlib.sha256(encoded).hexdigest() != checksum:
+            self.halt_trading("Risk state checksum mismatch")
+            raise ValueError("Risk state checksum mismatch")
+
+        required = {
+            "initial_balance", "peak_balance", "daily_starting_balance",
+            "kill_switch_triggered", "trading_halted", "safe_haven",
+            "active_compounding_capital", "current_regime",
+        }
+        if set(state) != required:
+            self.halt_trading("Risk state fields are invalid")
+            raise ValueError("Risk state fields are invalid")
+
+        if current_balance <= 0:
+            self.halt_trading("Current account balance is invalid")
+            raise ValueError("Current account balance is invalid")
+
+        try:
+            self.initial_balance = float(state["initial_balance"])
+            self.peak_balance = float(state["peak_balance"])
+            self.daily_starting_balance = float(state["daily_starting_balance"])
+            self.kill_switch_triggered = bool(state["kill_switch_triggered"])
+            self.trading_halted = bool(state["trading_halted"])
+            self.safe_haven = float(state["safe_haven"])
+            self.active_compounding_capital = float(state["active_compounding_capital"])
+            self.current_regime = RiskRegime(state["current_regime"])
+        except (TypeError, ValueError) as exc:
+            self.halt_trading("Risk state values are invalid")
+            raise ValueError("Risk state values are invalid") from exc
+
+        if (
+            self.initial_balance <= 0
+            or self.peak_balance <= 0
+            or self.daily_starting_balance < 0
+            or self.safe_haven < 0
+            or self.active_compounding_capital < 0
+        ):
+            self.halt_trading("Risk state contains invalid financial values")
+            raise ValueError("Risk state contains invalid financial values")
+
+        if current_balance > self.peak_balance:
+            self.peak_balance = current_balance
+        self._evaluate_regime(current_balance)
+        self._state_dirty = False
 
     def initialize_balance(self, current_balance: float):
         if current_balance <= 0:
@@ -39,6 +126,7 @@ class RiskManager:
         self.daily_starting_balance = current_balance
         self.active_compounding_capital = current_balance
         self._evaluate_regime(current_balance)
+        self._state_dirty = True
 
     def update_after_trade(self, current_balance: float, last_trade_pnl: float):
         if last_trade_pnl > 0 and self.current_regime == RiskRegime.DEFENSIVE:
@@ -46,6 +134,7 @@ class RiskManager:
         if current_balance > self.peak_balance:
             self.peak_balance = current_balance
         self._evaluate_regime(current_balance)
+        self._state_dirty = True
 
     def _evaluate_regime(self, current_balance: float):
         drawdown_pct = (
@@ -80,9 +169,11 @@ class RiskManager:
             return True
         if current_balance <= 0:
             self.kill_switch_triggered = True
+            self._state_dirty = True
             return True
         if current_balance > self.peak_balance:
             self.peak_balance = current_balance
+            self._state_dirty = True
 
         drawdown_pct = (
             ((self.peak_balance - current_balance) / self.peak_balance) * 100
@@ -92,6 +183,7 @@ class RiskManager:
 
         if drawdown_pct >= config.MAX_DRAWDOWN_PCT or daily_loss >= config.MAX_DAILY_LOSS_USDT:
             self.kill_switch_triggered = True
+            self._state_dirty = True
             return True
 
         if abs(current_position_size) > config.MAX_POSITION_SIZE:
