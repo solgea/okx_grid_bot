@@ -18,6 +18,7 @@ class RiskManager:
         self.peak_balance = 0.0
         self.daily_starting_balance = 0.0
         self.kill_switch_triggered = False
+        self.trading_halted = False
         self.safe_haven = 0.0
         self.active_compounding_capital = 0.0
         self.current_regime = RiskRegime.AGGRESSIVE
@@ -25,8 +26,13 @@ class RiskManager:
         self.taker_fee = getattr(config, "TAKER_FEE_PCT", 0.0005)
         self.slippage_buffer = getattr(config, "SLIPPAGE_PCT", 0.0001)
 
+    def halt_trading(self, reason: str):
+        self.trading_halted = True
+        logger.critical("Trading halted: %s", reason)
+
     def initialize_balance(self, current_balance: float):
         if current_balance <= 0:
+            self.halt_trading("Invalid or zero account balance")
             raise ValueError("Risk manager requires a positive starting balance")
         self.initial_balance = current_balance
         self.peak_balance = current_balance

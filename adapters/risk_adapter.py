@@ -13,14 +13,14 @@ class RiskPreFlightAdapter(IRiskManager):
 
     def is_kill_switch_active(self) -> bool:
         """Drawdown veya günlük kayıp limitleri aşıldıysa emri doğrudan reddeder."""
-        return self.rm.kill_switch_triggered
+        return self.rm.kill_switch_triggered or self.rm.trading_halted
 
     def is_trading_halted(self) -> bool:
         """
         Şimdilik FSM'in 'Durduruldu' (Halted) durumlarını kill-switch ile aynı kabul ediyoruz.
         Gelecekte borsa bakımı veya websocket kesintileri için genişletilebilir.
         """
-        return self.rm.kill_switch_triggered
+        return self.rm.kill_switch_triggered or self.rm.trading_halted
 
     def validate_position_limits(self, account, intent) -> bool:
         """
