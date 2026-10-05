@@ -50,6 +50,16 @@ class AccountState:
     leverage: Decimal = Decimal("10")
 
 @dataclass
+class TradingSnapshot:
+    """Atomic-at-boundary snapshot used by PreFlight."""
+    account: AccountState
+    market: MarketData
+    position_size: Decimal = Decimal("0")
+    open_order_exposure: Decimal = Decimal("0")
+    timestamp: float = 0.0
+
+
+@dataclass
 class MarketData:
     bid: Decimal = Decimal("0.0")
     ask: Decimal = Decimal("0.0")
