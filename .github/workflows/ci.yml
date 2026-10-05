@@ -24,24 +24,28 @@ jobs:
         run: pytest -q
       - name: Docker build
         run: docker build -t okx-grid-bot:ci .
-      - name: Docker runtime smoke (demo / dry-run only)
+      - name: Docker runtime smoke (OKX Demo read-only)
         run: |
-          set +e
-          timeout --signal=TERM 30s docker run --rm \
+          set -euo pipefail
+          test -n "$OKX_DEMO_API_KEY"
+          test -n "$OKX_DEMO_API_SECRET"
+          test -n "$OKX_DEMO_PASSPHRASE"
+          docker run --rm \
+            -e API_KEY \
+            -e API_SECRET \
+            -e PASSPHRASE \
             -e IS_DEMO=true \
             -e DRY_RUN=true \
-            -e LIVE_TRADING_ENABLED=false \
-            -e LIVE_TRADING_AUTHORIZED=false \
-            -e EMERGENCY_FLATTEN_ENABLED=false \
-            -e EMERGENCY_FLATTEN_AUTHORIZED=false \
-            -e KILL_SWITCH_ACTIVE=true \
-            okx-grid-bot:ci
-          rc=$?
-          if [ "$rc" -eq 124 ]; then
-            echo "Docker runtime smoke PASS: container remained running for 30s."
-            exit 0
-          fi
-          echo "Docker runtime smoke FAIL: container exited before timeout (rc=$rc)."
-          exit "$rc"
+            -e SYMBOL=ETH/USDT:USDT \
+            -e PYTHONPATH=/app \
+            okx-grid-bot:ci \
+            python scripts/okx_read_only_bootstrap.py
+        env:
+          API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          API_SECRET: ${{ secrets.OKX_DEMO_API_SECRET }}
+          PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_API_SECRET: ${{ secrets.OKX_DEMO_API_SECRET }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
 
       # Phase 2 — main validation trigger
