@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import hashlib
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any, Optional
@@ -21,11 +22,22 @@ _FILLED_OR_CANCELLED_CODES = ("51503",)
 _INSUFFICIENT_FUNDS_CODES = ("51008", "51004", "Insufficient")
 
 def _sanitize_cl_ord_id(cl_ord_id: Optional[str]) -> Optional[str]:
-    """Normalize an OKX client order id to the accepted alphanumeric format."""
+    """Normalize an OKX client order id while preventing truncation collisions."""
     if not cl_ord_id:
         return None
-    cleaned = re.sub(r"[^a-zA-Z0-9]", "", str(cl_ord_id))
-    return cleaned[:32] or None
+
+    original = str(cl_ord_id)
+    cleaned = re.sub(r"[^a-zA-Z0-9]", "", original)
+    if not cleaned:
+        return None
+
+    # Preserve already-valid short IDs exactly. For transformed or oversized
+    # IDs, reserve eight characters for a deterministic digest of the source.
+    if cleaned == original and len(cleaned) <= 32:
+        return cleaned
+
+    digest = hashlib.sha256(original.encode("utf-8")).hexdigest()[:8]
+    return f"{cleaned[:24]}{digest}"
 
 def _is_entry_intent(intent: Any) -> bool:
     side = intent.side.value.lower()

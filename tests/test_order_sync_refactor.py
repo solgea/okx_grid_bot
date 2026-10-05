@@ -13,7 +13,10 @@ def make_intent(side: str, position_side: str, reduce_only: bool = False):
 
 
 def test_client_order_id_is_normalized_and_bounded():
-    assert _sanitize_cl_ord_id("grid-01/A") == "grid01A"
+    normalized = _sanitize_cl_ord_id("grid-01/A")
+    assert normalized.startswith("grid01A")
+    assert len(normalized) <= 32
+    assert normalized.isalnum()
     assert len(_sanitize_cl_ord_id("x" * 40)) == 32
     assert _sanitize_cl_ord_id("---") is None
 
