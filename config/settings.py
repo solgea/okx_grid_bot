@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     # Safety defaults: an explicit .env value is required to leave simulation.
     IS_DEMO: bool = True
     DRY_RUN: bool = True
+    LIVE_TRADING_ENABLED: bool = False
+    LIVE_TRADING_AUTHORIZED: bool = False
 
     SYMBOL: str = CCXT_SYMBOL
     LEVERAGE: int = 10
