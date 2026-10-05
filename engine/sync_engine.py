@@ -6,6 +6,8 @@ import re
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any, Optional
+from dataclasses import dataclass
+from enum import Enum
 from config.settings import config
 from strategy.order_reconciler import ExistingOrder, GridOrderSpec, OrderReconciler
 from preflight_layer.domain import ExecutionAuthorization
@@ -58,6 +60,33 @@ def _to_grid_spec(intent: Any) -> GridOrderSpec:
 def _contains_error_code(error: Exception, codes: tuple[str, ...]) -> bool:
     message = str(error)
     return any(code.lower() in message.lower() for code in codes)
+
+
+class ExecutionStatus(str, Enum):
+    SUCCESS = "SUCCESS"
+    REJECTED = "REJECTED"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True)
+class BatchExecutionResult:
+    statuses: tuple[ExecutionStatus, ...]
+    results: tuple[Any, ...]
+
+
+def _classify_batch_result(result: Any) -> ExecutionStatus:
+    if not isinstance(result, dict):
+        return ExecutionStatus.UNKNOWN
+
+    info = result.get("info") or {}
+    code = str(info.get("sCode", result.get("sCode", "0")))
+    if code not in {"", "0"}:
+        return ExecutionStatus.REJECTED
+
+    if result.get("status") == "simulated" or result.get("id"):
+        return ExecutionStatus.SUCCESS
+
+    return ExecutionStatus.UNKNOWN
 
 class OrderSyncEngine:
     """Serialize reconciliation and apply its delta in safe batches."""
@@ -176,9 +205,42 @@ class OrderSyncEngine:
     async def _place_orders_async(self, place_specs: list[Any]) -> None:
         await self._run_in_batches(place_specs, self._place_batch, batch_size=_BATCH_SIZE, delay_seconds=_BATCH_DELAY_SECONDS)
 
-    async def _place_batch(self, batch: list[Any]) -> None:
-        orders = [{"side": spec.side, "amount": spec.size, "price": spec.price, "params": self._order_params(spec)} for spec in batch]
-        await self.engine.create_orders(config.SYMBOL, orders)
+    async def _place_batch(self, batch: list[Any]) -> BatchExecutionResult:
+        orders = [
+            {
+                "side": spec.side,
+                "amount": spec.size,
+                "price": spec.price,
+                "params": self._order_params(spec),
+            }
+            for spec in batch
+        ]
+        try:
+            raw_results = await self.engine.create_orders(config.SYMBOL, orders)
+        except Exception as exc:
+            logger.error("Batch order result UNKNOWN: %s", exc)
+            raise
+
+        if not isinstance(raw_results, list) or len(raw_results) != len(batch):
+            raise RuntimeError(
+                "Batch order result is UNKNOWN: response count does not match request count"
+            )
+
+        statuses = tuple(_classify_batch_result(result) for result in raw_results)
+        report = BatchExecutionResult(tuple(statuses), tuple(raw_results))
+        if ExecutionStatus.UNKNOWN in report.statuses:
+            raise RuntimeError(
+                "Batch order result is UNKNOWN: one or more exchange results were ambiguous"
+            )
+
+        rejected = sum(status is ExecutionStatus.REJECTED for status in report.statuses)
+        if rejected:
+            logger.warning(
+                "Batch order completed with %s/%s explicit rejections.",
+                rejected,
+                len(report.statuses),
+            )
+        return report
 
     @staticmethod
     async def _run_in_batches(items: list[Any], handler: Any, *, batch_size: int, delay_seconds: float) -> None:
