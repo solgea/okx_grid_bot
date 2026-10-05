@@ -25,7 +25,7 @@ def test_t02_create_order_only_transport():
     assert violations == []
 
 def test_t03_phase_a_rejects_real_transport():
-    with pytest.raises(ValueError, match="Phase A"):
+    with pytest.raises(RuntimeError, match="E_PHASE_LOCK"):
         OkxDemoTransport(object(), demo_phase="A", is_demo=True)
 
 def test_t06_persisted_seq_is_recovered():
