@@ -48,7 +48,7 @@ class ExchangeBoundaryProbe:
 
     async def create_orders(self, symbol, orders):
         self.create_orders_called = True
-        return []
+        return [{"id": "simulated-authorized-order", "status": "open"} for _ in orders]
 
 
 @pytest.mark.asyncio
