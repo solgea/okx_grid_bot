@@ -40,9 +40,14 @@ class FakeValidator:
 class ExchangeBoundaryProbe:
     def __init__(self):
         self.fetch_open_orders_called = False
+        self.create_orders_called = False
 
     async def fetch_open_orders(self, symbol):
         self.fetch_open_orders_called = True
+        return []
+
+    async def create_orders(self, symbol, orders):
+        self.create_orders_called = True
         return []
 
 
@@ -109,3 +114,4 @@ async def test_authorized_intents_can_reach_reconciliation():
     )
 
     assert probe.fetch_open_orders_called is True
+    assert probe.create_orders_called is True
