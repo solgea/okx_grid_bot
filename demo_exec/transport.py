@@ -20,26 +20,13 @@ class NullTransport:
         self.place_calls = 0
 
     async def place(self, intent: Intent) -> TransportResult:
-        self.place_calls += 1
-        return TransportResult("SHADOW_NOT_SENT", f"g{intent.agent_id}{intent.seq}")
-
-
-class OkxDemoTransport:
-    """The sole owner of Demo create_order. Never constructible in Phase A or live mode."""
-    def __init__(self, exchange: Any, *, demo_phase: str = "B", is_demo: bool = True) -> None:
-        if demo_phase == "A":
-            raise ValueError("E_PHASE_LOCK: real transport forbidden in Phase A")
-        if not is_demo:
-            raise ValueError("E_NOT_DEMO: Demo transport requires IS_DEMO=true")
-        self.exchange = exchange
-
-    async def place(self, intent: Intent) -> TransportResult:
-        order = await self.exchange.create_order(
-            symbol=intent.symbol,
-            type="limit",
-            side=intent.side,
-            amount=1,
-            price=None,
+        return await self.place_spec(
+            symbol=intent.symbol, side=intent.side, amount=1, price=None,
             params={"clientOrderId": f"g{intent.agent_id}{intent.seq}"},
         )
-        return TransportResult(str(order.get("status") or "ACKED"), str(order["id"]))
+
+    async def place_spec(self, *, symbol: str, side: str, amount: float, price: float | None, params: dict) -> TransportResult:
+        order = await self.exchange.create_order(
+            symbol=symbol, type="limit", side=side, amount=amount, price=price, params=params
+        )
+        return TransportResult(str(order.get("status") or "ACKED"), str(order.get("id") or ""))
