@@ -29,9 +29,9 @@ def intent(size="1", price="60000"):
 def metadata(contract_val="0.01", contract_type="linear"):
     return InstrumentMetadata(
         symbol="BTC/USDT:USDT",
-        min_size=Decimal("1"),
+        min_size=Decimal("0.01"),
         tick_size=Decimal("0.1"),
-        lot_size=Decimal("1"),
+        lot_size=Decimal("0.01"),
         contract_val=Decimal(contract_val),
         contract_type=contract_type,
         is_live=True,
@@ -68,8 +68,8 @@ def test_inverse_swap_notional_uses_contract_value_over_price():
 def test_preflight_rejects_margin_using_contract_notional(monkeypatch):
     monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator()
-    # 100 contracts × 0.01 BTC × 60,000 / 2 = 15,000 USDT margin.
-    result = validator.validate(intent(size="100"), metadata(), account("1000"), MarketData(
+    # 0.1 contracts × 0.01 BTC × 60,000 / 2 = 30 USDT margin.
+    result = validator.validate(intent(size="0.1"), metadata(), account("20"), MarketData(
         last=Decimal("60000"), timestamp=time.time()
     ))
     assert result.passed is False
@@ -79,8 +79,8 @@ def test_preflight_rejects_margin_using_contract_notional(monkeypatch):
 def test_preflight_accepts_margin_when_contract_value_is_accounted_for(monkeypatch):
     monkeypatch.setattr("config.settings.config.KILL_SWITCH_ACTIVE", False)
     validator = PreFlightValidator()
-    # 1 contract × 0.01 BTC × 60,000 / 2 = 300 USDT margin.
-    result = validator.validate(intent(size="1"), metadata(), account("500"), MarketData(
+    # 0.01 contracts × 0.01 BTC × 60,000 / 2 = 3 USDT margin.
+    result = validator.validate(intent(size="0.01"), metadata(), account("5"), MarketData(
         last=Decimal("60000"), timestamp=time.time()
     ))
     assert result.passed is True
