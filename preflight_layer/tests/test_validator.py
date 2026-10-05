@@ -50,7 +50,7 @@ class MockRiskManager(IRiskManager):
     def is_kill_switch_active(self) -> bool: return False
     def is_trading_halted(self) -> bool: return False
     def validate_position_limits(self, account, intent) -> bool: return True
-    def validate_risk(self, account, intent) -> bool: return True  
+    def validate_risk(self, account, intent, metadata=None) -> bool: return True  
 
 
 class HaltedRiskManager(MockRiskManager):
@@ -58,7 +58,7 @@ class HaltedRiskManager(MockRiskManager):
 
 
 class RejectingRiskManager(MockRiskManager):
-    def validate_risk(self, account, intent) -> bool: return False
+    def validate_risk(self, account, intent, metadata=None) -> bool: return False
 
 @pytest.fixture
 def validator():
