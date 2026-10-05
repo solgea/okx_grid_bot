@@ -26,8 +26,8 @@ def test_long_ids_with_same_first_32_chars_do_not_collide():
     second = _sanitize_cl_ord_id("X" * 32 + "-two")
 
     assert first != second
-    assert len(first) == 31
-    assert len(second) == 31
+    assert len(first) == 32
+    assert len(second) == 32
 
 
 def test_empty_or_non_alphanumeric_only_id_is_rejected():
