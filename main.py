@@ -261,15 +261,19 @@ async def main():
                     last=Decimal(str(current_price)),
                     timestamp=time.time(),
                 )
-                target_orders = order_manager.validate_intents(
+                target_orders, execution_authorization = order_manager.authorize_intents(
                     target_orders,
                     instrument_metadata,
                     preflight_account,
                     preflight_market,
                 )
                 
-                # is_limit_breached bayrağını Reconciler'a iletiyoruz:
-                await sync.sync_orders(target_orders, is_limit_breached=is_limit_breached)
+                # Execution boundary requires the exact PreFlight authorization token.
+                await sync.sync_orders(
+                    target_orders,
+                    authorization=execution_authorization,
+                    is_limit_breached=is_limit_breached,
+                )
 
                 if retry_count > 0:
                     logger.info("✅ API bağlantısı normale döndü. Gecikme sayacı sıfırlandı.")
