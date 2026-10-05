@@ -42,6 +42,16 @@ class GridEngine:
     def _quantize_size(value: Decimal) -> Decimal:
         return value.quantize(Decimal("0.00000001"), rounding=ROUND_DOWN).normalize()
 
+    @property
+    def grid_step(self) -> float:
+        """Compatibility view; calculations use the private Decimal value."""
+        return float(self._grid_step)
+
+    @property
+    def grid_levels(self) -> list[float]:
+        """Compatibility view; calculations use private Decimal levels."""
+        return [float(level) for level in self._grid_levels]
+
     def __init__(self, lower_price: float, upper_price: float, grid_count: int, contract_size: float, 
                  price_precision: int = 2, oob_min_width_pct: float = 0.0, oob_buffer_pct: float = 0.0,
                  min_step_pct: float = 0.0020, tp_margin_pct: float = 0.0025):
@@ -60,8 +70,8 @@ class GridEngine:
         self.min_step_pct = self._decimal(min_step_pct)
         self.tp_margin_pct = self._decimal(tp_margin_pct)
 
-        self.grid_step = Decimal("0")
-        self.grid_levels: list[Decimal] = []
+        self._grid_step = Decimal("0")
+        self._grid_levels: list[Decimal] = []
         self.state = GridState.INITIALIZING
         self.previous_state = None
         self.state_reason = "Grid hesaplanıyor"
@@ -127,7 +137,7 @@ class GridEngine:
         """
         if confluence_score is not None:
             self.confluence_score = max(0, min(100, int(confluence_score)))
-        if current_price <= 0 or self.lower_price >= self.upper_price or not self.grid_levels:
+        if current_price <= 0 or self.lower_price >= self.upper_price or not self._grid_levels:
             self._transition(GridState.PAUSED, "Geçersiz fiyat veya grid aralığı")
         elif confluence_score is not None and self.confluence_score < 50:
             self._transition(GridState.RISK_OFF, "Kurumsal confluence skoru düşük")
@@ -147,25 +157,25 @@ class GridEngine:
     def _calculate_grid(self):
         """Calculate grid levels with deterministic Decimal arithmetic."""
         if self.lower_price >= self.upper_price:
-            self.grid_step = Decimal("0")
+            self._grid_step = Decimal("0")
             level = self._quantize_price(self.lower_price)
-            self.grid_levels = [level] * self.grid_count
+            self._grid_levels = [level] * self.grid_count
             return
 
         min_required_step = self.lower_price * self.min_step_pct
         raw_step = (self.upper_price - self.lower_price) / Decimal(self.grid_count - 1)
 
         if raw_step < min_required_step:
-            self.grid_step = min_required_step
+            self._grid_step = min_required_step
             self.grid_count = max(
                 2,
-                int((self.upper_price - self.lower_price) / self.grid_step) + 1,
+                int((self.upper_price - self.lower_price) / self._grid_step) + 1,
             )
         else:
-            self.grid_step = raw_step
+            self._grid_step = raw_step
 
-        self.grid_levels = [
-            self._quantize_price(self.lower_price + (Decimal(i) * self.grid_step))
+        self._grid_levels = [
+            self._quantize_price(self.lower_price + (Decimal(i) * self._grid_step))
             for i in range(self.grid_count)
         ]
 
@@ -274,7 +284,7 @@ class GridEngine:
         entry_dec = entry_price_dec
         spread_tolerance = self._price_quantum()
 
-        for lvl in self.grid_levels:
+        for lvl in self._grid_levels:
             if abs(lvl - current_price_dec) < spread_tolerance:
                 continue
 
@@ -319,9 +329,9 @@ class GridEngine:
                     intent.expected_target_price = entry_dec
                 else:
                     if side_str == "buy":
-                        intent.expected_target_price = lvl + self.grid_step
+                        intent.expected_target_price = lvl + self._grid_step
                     else:
-                        intent.expected_target_price = lvl - self.grid_step
+                        intent.expected_target_price = lvl - self._grid_step
                 intent.is_maker = True
                 intents.append(intent)
         return intents
