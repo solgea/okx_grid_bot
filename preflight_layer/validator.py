@@ -34,6 +34,21 @@ class PreFlightValidator:
         self.state = PreFlightState.CREATED
 
     @staticmethod
+    def _contract_notional(intent: OrderIntent, metadata: InstrumentMetadata) -> Decimal:
+        """Return quote-currency notional for linear/inverse OKX contracts."""
+        contracts = intent.size
+        price = intent.price
+        ct_val = metadata.contract_val
+        if contracts <= 0 or price <= 0 or ct_val <= 0:
+            raise ValueError("Invalid contract sizing inputs")
+        contract_type = metadata.contract_type.lower()
+        if contract_type == "linear":
+            return contracts * ct_val * price
+        if contract_type == "inverse":
+            return contracts * ct_val / price
+        raise ValueError(f"Unsupported contract type: {metadata.contract_type}")
+
+    @staticmethod
     def _reject(result, code, message):
         result.passed = False
         result.rejection_code = code
@@ -78,6 +93,9 @@ class PreFlightValidator:
         if metadata.contract_val <= 0:
             self.state = self._reject(result, PF013_INVALID_CONTRACT_VALUE, "Invalid exchange contract value.")
             return result
+        if metadata.contract_type.lower() not in {"linear", "inverse"}:
+            self.state = self._reject(result, PF014_INVALID_CONTRACT_TYPE, f"Unsupported contract type: {metadata.contract_type}.")
+            return result
         if intent.price is None or intent.price <= 0:
             self.state = self._reject(result, PF007_INVALID_PRICE, "Order price must be positive.")
             return result
@@ -120,13 +138,17 @@ class PreFlightValidator:
             self.state = self._reject(result, PF025_STALE_MARKET_DATA, f"Market data is stale ({age:.1f}s).")
             return result
 
-        estimated_cost = intent.size * intent.price
-        required_margin = estimated_cost / intent.leverage
+        try:
+            estimated_notional = self._contract_notional(intent, metadata)
+        except ValueError as exc:
+            self.state = self._reject(result, PF013_INVALID_CONTRACT_VALUE, str(exc))
+            return result
+        required_margin = estimated_notional / intent.leverage
         if required_margin > account.available_margin:
             self.state = self._reject(result, PF017_INSUFFICIENT_MARGIN, f"Required margin {required_margin} exceeds available margin {account.available_margin}.")
             return result
 
-        if self.risk_manager and not self.risk_manager.validate_risk(account, intent):
+        if self.risk_manager and not self.risk_manager.validate_risk(account, intent, metadata):
             self.state = self._reject(result, "RISK_VALIDATION_FAILED", "Order rejected by risk manager.")
             logger.warning("PreFlight risk rejection: instrument=%s size=%s", intent.instrument_id, intent.size)
             return result
