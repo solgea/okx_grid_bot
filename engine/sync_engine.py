@@ -37,7 +37,7 @@ def _sanitize_cl_ord_id(cl_ord_id: Optional[str]) -> Optional[str]:
         return cleaned
 
     digest = hashlib.sha256(original.encode("utf-8")).hexdigest()[:8]
-    return f"{cleaned[:23]}{digest}"
+    return f"{cleaned[:24]}{digest}"
 
 def _is_entry_intent(intent: Any) -> bool:
     side = intent.side.value.lower()
