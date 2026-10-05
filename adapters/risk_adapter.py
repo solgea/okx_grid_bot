@@ -78,12 +78,14 @@ class RiskPreFlightAdapter(IRiskManager):
         target_price = getattr(intent, 'expected_target_price', None)
         
         if not target_price:
-            logger.debug("⚠️ Friction filtresi atlandı: intent nesnesinde 'expected_target_price' bulunamadı.")
-            return True # Hedef belli değilse es geç (veya strict modda False döndürebilirsiniz)
+            logger.warning(
+                "❌ PreFlight REDDİ: expected_target_price is required for friction validation."
+            )
+            return False
             
         is_maker = getattr(intent, 'is_maker', True) # Grid limit emirleri varsayılan olarak maker'dır
         
-        return self.rm.check_trade_viability(entry_price, target_price, is_maker)
+        return self.rm.check_trade_viability(entry_price, float(target_price), is_maker)
 
     def validate_risk(self, account, intent) -> bool:
         """
