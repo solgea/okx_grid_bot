@@ -1,5 +1,3 @@
-import hashlib
-
 from engine.sync_engine import _sanitize_cl_ord_id
 
 
