@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from hashlib import sha256
 
 from .intent import Intent
 from .journal import Journal
@@ -56,6 +57,9 @@ class DemoExecutor:
     @staticmethod
     def _cl_id(intent: Intent) -> str:
         value = f"g{intent.agent_id}{intent.seq}"
-        if not value.isalnum() or len(value) > 32:
-            raise ValueError("invalid clOrdId")
-        return value
+        if value.isalnum() and len(value) <= 32:
+            return value
+        # Stable fallback: valid for exchange client-order-ID constraints and
+        # reproducible across process restarts for the same agent/sequence.
+        digest = sha256(f"{intent.agent_id}:{intent.seq}".encode("utf-8")).hexdigest()
+        return f"g{digest[:31]}"
