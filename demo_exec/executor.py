@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from hashlib import sha256
 
 from .intent import Intent
 from .journal import Journal
@@ -51,11 +52,15 @@ class DemoExecutor:
             if self.journal:
                 self.journal.append({"event":"UNKNOWN","agent_id":intent.agent_id,"seq":intent.seq})
             return SubmitResult(False, "E_TRANSPORT", LifecycleState.UNKNOWN.value, cl_id)
-        return SubmitResult(True, "SHADOW", LifecycleState.SUBMITTED.value, result.client_order_id)
+        return SubmitResult(True, "SHADOW", LifecycleState.SUBMITTED.value, cl_id)
 
     @staticmethod
     def _cl_id(intent: Intent) -> str:
         value = f"g{intent.agent_id}{intent.seq}"
-        if not value.isalnum() or len(value) > 32:
-            raise ValueError("invalid clOrdId")
-        return value
+        if value.isascii() and value.isalnum() and len(value) <= 32:
+            return value
+        digest = sha256(f"{intent.agent_id}:{intent.seq}".encode("utf-8")).hexdigest()
+        normalized = f"g{digest[:31]}"
+        if not normalized.isascii() or not normalized.isalnum() or len(normalized) > 32:
+            raise ValueError("failed to normalize clOrdId")
+        return normalized
