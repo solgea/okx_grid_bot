@@ -1,43 +1,19 @@
-# Master Orchestrator Runtime
+# Agent Orchestration — Deferred
 
-The runtime is a local control-plane adapter around the existing MasterOrchestrator. It accepts validated task envelopes and exposes observation commands; it is not a trading interface.
+**Status: DISABLED / DEFERRED.**
 
-## Commands
+The agent orchestration system is not part of the core-first stabilization phase. Do not launch `orchestrator.cli`, `MasterOrchestrator`, or agent lifecycle tasks while the core is being made buildable and test-stable. The engineering-agent GitHub Actions workflow has been removed from this branch so CI failures no longer trigger agent automation.
 
-Submit a task:
+## Re-enable criteria
 
-    python -m orchestrator.cli --root .orchestrator submit task.json
+Reintroduce the agent system only in a separate, reviewed phase after all of the following are evidenced on the core branch:
 
-Run an accepted task:
+1. Python compile/import checks pass.
+2. Core unit and integration tests pass consistently.
+3. Docker image builds and the local runtime smoke test passes.
+4. OKX read-only bootstrap is verified without invoking exchange mutation methods.
+5. CI is green on the exact commit proposed for merge.
 
-    python -m orchestrator.cli --root .orchestrator run <task_id>
+Re-enabling agents must not change risk gates or grant order, merge, deployment, or live-trading authority. Phase B remains locked; live trading and Emergency Flatten remain disabled.
 
-Observe status:
-
-    python -m orchestrator.cli --root .orchestrator status <task_id>
-
-Read the lifecycle report:
-
-    python -m orchestrator.cli --root .orchestrator report <task_id>
-
-The task file must contain task_id, type, priority, scope, allowed_actions, forbidden_actions, and success_condition.
-
-## Safety
-
-The intake fails closed for restricted capabilities such as live orders, live exchange/account mutation, production deployment, policy changes, and merge authority. Runtime completion does not authorize merge, deployment, live trading, or close G8/G9.
-
-For OKX execution, **PreFlight != AUTHORIZED is never permission to submit an exchange order.**
-
-The runtime does not provide arbitrary shell execution and does not expose exchange credentials or order operations.
-
-## Observation
-
-Task state is persisted under the configured root, with one task record per task and an append-ordered EVENTS.jsonl audit log. The persistence format is readable without the runtime and is isolated by --root for tests.
-
-## Lifecycle
-
-The runtime delegates the existing lifecycle to MasterOrchestrator:
-
-RECEIVED -> OBSERVING -> DIAGNOSING -> PLANNING -> POLICY_CHECK -> EXECUTING -> VERIFYING -> REVIEWING -> COMMITTED -> REPORTED
-
-Policy, agent, verification, reviewer, and commit failures remain visible as BLOCKED or controlled diagnosis transitions. COMMITTED requires explicit commit evidence and successful verification evidence.
+The existing orchestration source and tests are retained temporarily to avoid deleting code before dependency/import boundaries are mapped. They are deferred, not considered part of the runnable core, and must be removed or reintroduced deliberately in the next refactor step.
