@@ -57,7 +57,7 @@ class DemoExecutor:
     @staticmethod
     def _cl_id(intent: Intent) -> str:
         value = f"g{intent.agent_id}{intent.seq}"
-        if value.isalnum() and len(value) <= 32:
+        if value.isascii() and value.isalnum() and len(value) <= 32:
             return value
         # Stable fallback: valid for exchange client-order-ID constraints and
         # reproducible across process restarts for the same agent/sequence.
