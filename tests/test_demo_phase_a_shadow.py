@@ -7,10 +7,40 @@ from demo_exec.intent import Intent
 from demo_exec.lifecycle import Lifecycle, LifecycleState
 from demo_exec.journal import Journal
 from demo_exec.transport import NullTransport
+from scripts.record_phase_a_evidence import acceptance_passes
 
 
 def intent(seq=1, agent_id="agent1"):
     return Intent.create(agent_id, "ETH/USDT:USDT", "buy", "test", seq)
+
+
+def test_phase_a_daily_gate_accepts_zero_safety_counters():
+    assert acceptance_passes({
+        "daily_shadow_run": True,
+        "null_transport_only": True,
+        "unexpected_exchange_order_calls": 0,
+        "unresolved_incidents": 0,
+    })
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"daily_shadow_run": False},
+        {"null_transport_only": False},
+        {"unexpected_exchange_order_calls": 1},
+        {"unresolved_incidents": 1},
+    ],
+)
+def test_phase_a_daily_gate_rejects_failed_conditions(override):
+    acceptance = {
+        "daily_shadow_run": True,
+        "null_transport_only": True,
+        "unexpected_exchange_order_calls": 0,
+        "unresolved_incidents": 0,
+    }
+    acceptance.update(override)
+    assert acceptance_passes(acceptance) is False
 
 
 def test_phase_a_requires_null_transport():
