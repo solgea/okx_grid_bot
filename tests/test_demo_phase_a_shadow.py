@@ -76,6 +76,7 @@ def test_write_ahead_journal(tmp_path):
 def test_clordid_is_bounded_and_alphanumeric():
     result = asyncio.run(DemoExecutor(NullTransport()).submit(intent(12)))
     assert result.client_order_id == "gagent112"
+    assert result.client_order_id.isascii()
     assert result.client_order_id.isalnum()
     assert len(result.client_order_id) <= 32
 
