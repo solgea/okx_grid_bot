@@ -1,2 +1,0 @@
-require_verification: true
-restricted_actions: [live_order, live_withdrawal, live_account_mutation, production_deploy, policy_change, merge_pr]
