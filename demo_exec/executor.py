@@ -52,7 +52,7 @@ class DemoExecutor:
             if self.journal:
                 self.journal.append({"event":"UNKNOWN","agent_id":intent.agent_id,"seq":intent.seq})
             return SubmitResult(False, "E_TRANSPORT", LifecycleState.UNKNOWN.value, cl_id)
-        return SubmitResult(True, "SHADOW", LifecycleState.SUBMITTED.value, result.client_order_id)
+        return SubmitResult(True, "SHADOW", LifecycleState.SUBMITTED.value, cl_id)
 
     @staticmethod
     def _cl_id(intent: Intent) -> str:
