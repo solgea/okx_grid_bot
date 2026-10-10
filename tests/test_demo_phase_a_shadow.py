@@ -9,8 +9,8 @@ from demo_exec.journal import Journal
 from demo_exec.transport import NullTransport
 
 
-def intent(seq=1):
-    return Intent.create("agent1", "ETH/USDT:USDT", "buy", "test", seq)
+def intent(seq=1, agent_id="agent1"):
+    return Intent.create(agent_id, "ETH/USDT:USDT", "buy", "test", seq)
 
 
 def test_phase_a_requires_null_transport():
@@ -76,5 +76,31 @@ def test_write_ahead_journal(tmp_path):
 def test_clordid_is_bounded_and_alphanumeric():
     result = asyncio.run(DemoExecutor(NullTransport()).submit(intent(12)))
     assert result.client_order_id == "gagent112"
+    assert result.client_order_id.isalnum()
+    assert len(result.client_order_id) <= 32
+
+
+def test_clordid_normalizes_agent_ids_with_punctuation():
+    result = asyncio.run(
+        DemoExecutor(NullTransport()).submit(intent(3, agent_id="phase-a-agent"))
+    )
+    assert result.client_order_id.isalnum()
+    assert len(result.client_order_id) <= 32
+
+
+def test_clordid_normalization_is_deterministic_across_executors():
+    first = asyncio.run(
+        DemoExecutor(NullTransport()).submit(intent(7, agent_id="phase-a-agent"))
+    )
+    second = asyncio.run(
+        DemoExecutor(NullTransport()).submit(intent(7, agent_id="phase-a-agent"))
+    )
+    assert first.client_order_id == second.client_order_id
+
+
+def test_clordid_normalizes_long_agent_ids():
+    result = asyncio.run(
+        DemoExecutor(NullTransport()).submit(intent(8, agent_id="a" * 80))
+    )
     assert result.client_order_id.isalnum()
     assert len(result.client_order_id) <= 32
