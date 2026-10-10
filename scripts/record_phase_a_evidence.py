@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from demo_exec.executor import DemoExecutor
 from demo_exec.intent import Intent
@@ -14,6 +15,16 @@ from demo_exec.transport import NullTransport
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_DIR = ROOT / "artifacts" / "phase_a"
 SYMBOL = os.getenv("PHASE_A_SYMBOL", "ETH/USDT:USDT")
+
+
+def acceptance_passes(acceptance: dict[str, Any]) -> bool:
+    """Validate Phase-A booleans and zero-valued safety counters explicitly."""
+    return (
+        acceptance.get("daily_shadow_run") is True
+        and acceptance.get("null_transport_only") is True
+        and acceptance.get("unexpected_exchange_order_calls") == 0
+        and acceptance.get("unresolved_incidents") == 0
+    )
 
 
 async def run_shadow() -> dict:
@@ -65,7 +76,7 @@ async def run_shadow() -> dict:
         },
     }
 
-    if not all(evidence["acceptance"].values()):
+    if not acceptance_passes(evidence["acceptance"]):
         raise RuntimeError("E_PHASE_A_DAILY_GATE")
 
     path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
