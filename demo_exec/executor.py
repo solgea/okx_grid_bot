@@ -59,7 +59,8 @@ class DemoExecutor:
         value = f"g{intent.agent_id}{intent.seq}"
         if value.isascii() and value.isalnum() and len(value) <= 32:
             return value
-        # Stable fallback: valid for exchange client-order-ID constraints and
-        # reproducible across process restarts for the same agent/sequence.
         digest = sha256(f"{intent.agent_id}:{intent.seq}".encode("utf-8")).hexdigest()
-        return f"g{digest[:31]}"
+        normalized = f"g{digest[:31]}"
+        if not normalized.isascii() or not normalized.isalnum() or len(normalized) > 32:
+            raise ValueError("failed to normalize clOrdId")
+        return normalized
