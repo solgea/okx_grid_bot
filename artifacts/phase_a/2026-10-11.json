@@ -1,0 +1,44 @@
+{
+  "acceptance": {
+    "daily_shadow_run": true,
+    "null_transport_only": true,
+    "unexpected_exchange_order_calls": 0,
+    "unresolved_incidents": 0
+  },
+  "date_utc": "2026-10-11",
+  "exchange_mutation_calls": 0,
+  "exchange_touched": false,
+  "git_sha": "eca0b738e5cc8f5c2c4304078893c25560b1cfe1",
+  "incidents": [],
+  "intent_count": 3,
+  "journal_event_count": 3,
+  "null_transport_place_calls": 3,
+  "phase": "A",
+  "recorded_at_utc": "2026-10-11T05:39:37.673141+00:00",
+  "results": [
+    {
+      "accepted": true,
+      "client_order_id": "g7a4e8df345c486e820aa16e5c0e13e9",
+      "code": "SHADOW",
+      "seq": 1,
+      "state": "SUBMITTED"
+    },
+    {
+      "accepted": true,
+      "client_order_id": "g9680e01251e38b53229884ecb7f3d62",
+      "code": "SHADOW",
+      "seq": 2,
+      "state": "SUBMITTED"
+    },
+    {
+      "accepted": true,
+      "client_order_id": "g2bdcf0e64d9549917e962dd4e2a3330",
+      "code": "SHADOW",
+      "seq": 3,
+      "state": "SUBMITTED"
+    }
+  ],
+  "schema": "phase-a-evidence.v1",
+  "symbol": "ETH/USDT:USDT",
+  "transport": "NullTransport"
+}
