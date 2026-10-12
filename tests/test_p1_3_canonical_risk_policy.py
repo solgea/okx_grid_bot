@@ -69,7 +69,10 @@ def test_validator_uses_policy_max_leverage():
     assert result.passed is False
 
 
-def test_t27_stale_market_data_is_rejected_offline():
+def test_t27_stale_market_data_is_rejected_offline(monkeypatch):
+    # Isolate stale-data validation from the independent global kill-switch gate.
+    # The production risk policy remains unchanged; monkeypatch restores config after this test.
+    monkeypatch.setattr(config, "KILL_SWITCH_ACTIVE", False)
     import time
     from decimal import Decimal
     from preflight_layer.domain import AccountState, InstrumentMetadata, MarketData, OrderIntent, OrderSide, OrderType
