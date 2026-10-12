@@ -10,23 +10,25 @@ from scripts import okx_demo_assumptions_check as chk
 class FakeExchange:
     def __init__(self, fail=()):
         self.fail, self.calls = set(fail), []
+        self.params = {}
 
     def market(self, symbol):
-        return {"id": "ETH-USDT-SWAP"}
+        return {"id": "ETH-USDT-SWAP", "base": "ETH", "quote": "USDT", "info": {"instFamily": "ETH-USDT"}}
 
-    async def _get(self, name, payload):
+    async def _get(self, name, payload, params=None):
         self.calls.append(name)
+        self.params[name] = params
         if name in self.fail:
             raise RuntimeError("boom secret-key")
         return payload
 
-    async def privateGetAccountConfig(self, p): return await self._get("config", {"data": [{"posMode": "net_mode", "acctLv": "2"}]})
-    async def publicGetPublicInstruments(self, p): return await self._get("inst", {"data": [{"tickSz": "0.01", "lotSz": "0.01", "minSz": "0.01", "ctVal": "0.1", "ctMult": "1", "state": "live"}]})
-    async def privateGetTradeOrdersAlgoPending(self, p): return await self._get("algo", {"data": []})
-    async def privateGetAccountTradeFee(self, p): return await self._get("fee", {"data": [{"maker": "-0.0002", "taker": "-0.0005"}]})
-    async def privateGetTradeFills(self, p): return await self._get("fills", {"data": []})
-    async def privateGetAccountBills(self, p): return await self._get("bills", {"data": []})
-    async def publicGetPublicFundingRate(self, p): return await self._get("fr", {"data": [{"fundingRate": "0.0001", "nextFundingTime": "1"}]})
+    async def privateGetAccountConfig(self, p): return await self._get("config", {"data": [{"posMode": "net_mode", "acctLv": "2"}]}, p)
+    async def publicGetPublicInstruments(self, p): return await self._get("inst", {"data": [{"tickSz": "0.01", "lotSz": "0.01", "minSz": "0.01", "ctVal": "0.1", "ctMult": "1", "state": "live"}]}, p)
+    async def privateGetTradeOrdersAlgoPending(self, p): return await self._get("algo", {"data": []}, p)
+    async def privateGetAccountTradeFee(self, p): return await self._get("fee", {"data": [{"maker": "-0.0002", "taker": "-0.0005"}]}, p)
+    async def privateGetTradeFills(self, p): return await self._get("fills", {"data": []}, p)
+    async def privateGetAccountBills(self, p): return await self._get("bills", {"data": []}, p)
+    async def publicGetPublicFundingRate(self, p): return await self._get("fr", {"data": [{"fundingRate": "0.0001", "nextFundingTime": "1"}]}, p)
     # mutating surface that must be blocked
     def privatePostTradeOrder(self, p): self.calls.append("MUTATION"); return {}
     def create_order(self, *a): self.calls.append("MUTATION"); return {}
@@ -60,11 +62,25 @@ def test_run_checks_reports_values_and_marks_unprovable_items():
     res = run(chk.run_checks(ex, "ETH/USDT:USDT"))
     assert res["pos_mode"]["posMode"] == "net_mode" and res["instrument"]["tickSz"] == "0.01"
     assert res["fee_rates"]["taker"] == "-0.0005" and res["algo_pending_query"]["pending_conditional_orders"] == 0
+    assert ex.params["fee"] == {"instType": "SWAP", "instFamily": "ETH-USDT"}
     assert res["fills_fee_fields"]["status"] == "NO_DATA" and res["funding_bills"]["status"] == "NO_DATA"
     for key in ("attach_algo_orders", "reduce_only", "duplicate_cl_ord_id_behavior", "demo_supports_attached_sl"):
         assert res[key]["status"] == "UNVERIFIED_READ_ONLY"
     assert chk.summarize(res)["failed"] == []
 
+
+
+def test_empty_swap_fee_rates_are_recorded_as_no_data():
+    class EmptyFeeExchange(FakeExchange):
+        async def privateGetAccountTradeFee(self, p):
+            return await self._get("fee", {"data": [{"maker": "", "taker": ""}]}, p)
+
+    ex = EmptyFeeExchange()
+    chk.harden(ex)
+    res = run(chk.run_checks(ex, "ETH/USDT:USDT"))
+    assert res["fee_rates"]["status"] == "NO_DATA"
+    assert "fee_rates" in chk.summarize(res)["unverified"]
+    assert chk.summarize(res)["failed"] == []
 
 def test_failures_are_isolated_and_secrets_are_scrubbed():
     ex = FakeExchange(fail={"algo"}); chk.harden(ex)

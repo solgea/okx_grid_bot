@@ -1,0 +1,90 @@
+{
+  "mode": "DEMO_READ_ONLY",
+  "symbol": "ETH/USDT:USDT",
+  "timestamp": 1791804188.9763873,
+  "results": {
+    "algo_pending_query": {
+      "pending_conditional_orders": 0,
+      "query": "reachable",
+      "status": "OK"
+    },
+    "attach_algo_orders": {
+      "prove_in": "first controlled Phase B run",
+      "status": "UNVERIFIED_READ_ONLY"
+    },
+    "cl_ord_id_rule": {
+      "example_digit_first_rejected": true,
+      "example_ok": true,
+      "rule": "1-32 case-sensitive alphanumerics, start with a letter",
+      "status": "DOC_ONLY"
+    },
+    "demo_supports_attached_sl": {
+      "prove_in": "first controlled Phase B run",
+      "status": "UNVERIFIED_READ_ONLY"
+    },
+    "duplicate_cl_ord_id_behavior": {
+      "prove_in": "first controlled Phase B run",
+      "status": "UNVERIFIED_READ_ONLY"
+    },
+    "fee_rates": {
+      "maker": "",
+      "note": "endpoint reachable but Demo response did not include usable fee rates",
+      "status": "NO_DATA",
+      "taker": ""
+    },
+    "fills_fee_fields": {
+      "note": "no fills yet; fee fields unproven until a fill exists",
+      "status": "NO_DATA"
+    },
+    "funding_bills": {
+      "note": "no funding bills yet",
+      "query": "reachable",
+      "status": "NO_DATA"
+    },
+    "funding_rate": {
+      "has_fundingRate": true,
+      "has_nextFundingTime": true,
+      "status": "OK"
+    },
+    "inst_family": "ETH-USDT",
+    "inst_id": "ETH-USDT-SWAP",
+    "instrument": {
+      "ctMult": "1",
+      "ctVal": "0.1",
+      "lotSz": "0.01",
+      "minSz": "0.01",
+      "state": "live",
+      "status": "OK",
+      "tickSz": "0.01"
+    },
+    "pos_mode": {
+      "acctLv": "2",
+      "posMode": "net_mode",
+      "status": "OK"
+    },
+    "reduce_only": {
+      "prove_in": "first controlled Phase B run",
+      "status": "UNVERIFIED_READ_ONLY"
+    }
+  },
+  "summary": {
+    "failed": [],
+    "unverified": [
+      "attach_algo_orders",
+      "cl_ord_id_rule",
+      "demo_supports_attached_sl",
+      "duplicate_cl_ord_id_behavior",
+      "fee_rates",
+      "fills_fee_fields",
+      "funding_bills",
+      "reduce_only"
+    ]
+  },
+  "evidence": {
+    "recorded_at_utc": "2026-10-12T11:23:08.976Z",
+    "tested_commit_sha": "38a52b1bfff5d5814bc1c23d1ae453f4b872f3ce",
+    "ci_run_url": "https://github.com/solgea/okx_grid_bot/actions/runs/38242245197",
+    "assumptions_run_url": "https://github.com/solgea/okx_grid_bot/actions/runs/38242245161",
+    "artifact_url": "https://github.com/solgea/okx_grid_bot/actions/runs/38242245161/artifacts/11743376138"
+  }
+}

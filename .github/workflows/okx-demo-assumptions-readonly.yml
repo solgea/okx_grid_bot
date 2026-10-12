@@ -1,0 +1,58 @@
+name: OKX Demo Assumptions (Read Only)
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "scripts/okx_demo_assumptions_check.py"
+      - ".github/workflows/okx-demo-assumptions-readonly.yml"
+      - "Dockerfile"
+      - "requirements.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assumptions-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required demo secrets exist
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_API_SECRET: ${{ secrets.OKX_DEMO_API_SECRET }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          test -n "$OKX_DEMO_API_KEY"
+          test -n "$OKX_DEMO_API_SECRET"
+          test -n "$OKX_DEMO_PASSPHRASE"
+      - name: Build isolated runtime image
+        run: docker build -t okx-grid-bot:assumptions-readonly .
+      - name: Run hardened read-only assumptions check
+        env:
+          API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          API_SECRET: ${{ secrets.OKX_DEMO_API_SECRET }}
+          PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/phase_a
+          docker run --rm \
+            -e API_KEY \
+            -e API_SECRET \
+            -e PASSPHRASE \
+            -e IS_DEMO=true \
+            -e DRY_RUN=true \
+            -e SYMBOL=ETH/USDT:USDT \
+            -e PYTHONPATH=/app \
+            okx-grid-bot:assumptions-readonly \
+            python scripts/okx_demo_assumptions_check.py \
+            | tee artifacts/phase_a/okx-demo-assumptions-readonly.json
+      - name: Upload read-only verification record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: okx-demo-assumptions-readonly
+          path: artifacts/phase_a/okx-demo-assumptions-readonly.json
+          if-no-files-found: warn

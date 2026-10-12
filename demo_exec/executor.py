@@ -17,27 +17,35 @@ class SubmitResult:
 
 class DemoExecutor:
     """Single execution authority; Phase A is permanently NullTransport-only."""
-    def __init__(self, transport: Transport, *, demo_phase: str = "A", enabled: bool = True, journal: Journal | None = None) -> None:
+    def __init__(self, transport: Transport, *, demo_phase: str = "A", enabled: bool = True, is_demo: bool = True, journal: Journal | None = None) -> None:
         if demo_phase != "A":
             raise ValueError("E_PHASE_LOCK: Phase A requires DEMO_PHASE=A")
         if not isinstance(transport, NullTransport):
             raise ValueError("E_PHASE_LOCK: Phase A requires NullTransport")
         self.transport = transport
         self.enabled = enabled
+        self.is_demo = is_demo
         self.journal = journal
         self._seen: set[tuple[str, int]] = set()
+        self._stopped = False
         if journal:
             for row in journal.read():
                 if row.get("event") == "INTENT":
                     self._seen.add((str(row["agent_id"]), int(row["seq"])))
+                elif row.get("event") == "UNKNOWN":
+                    self._stopped = True
 
     async def submit(self, intent: Intent) -> SubmitResult:
         cl_id = self._cl_id(intent)
+        if not self.is_demo:
+            return SubmitResult(False, "E_NOT_DEMO", LifecycleState.NEW.value, cl_id)
         if not self.enabled:
             return SubmitResult(False, "E_DISABLED", LifecycleState.NEW.value, cl_id)
         key = (intent.agent_id, intent.seq)
         if key in self._seen:
             return SubmitResult(False, "E_JOURNAL", LifecycleState.NEW.value, cl_id)
+        if self._stopped:
+            return SubmitResult(False, "E_AGENT_STATE", LifecycleState.UNKNOWN.value, cl_id)
         if intent.seq < 1:
             return SubmitResult(False, "E_LIMIT", LifecycleState.NEW.value, cl_id)
         if self.journal:
@@ -49,6 +57,7 @@ class DemoExecutor:
         try:
             result = await self.transport.place(intent)
         except TimeoutError:
+            self._stopped = True
             if self.journal:
                 self.journal.append({"event":"UNKNOWN","agent_id":intent.agent_id,"seq":intent.seq})
             return SubmitResult(False, "E_TRANSPORT", LifecycleState.UNKNOWN.value, cl_id)
