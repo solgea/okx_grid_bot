@@ -27,6 +27,25 @@ def acceptance_passes(acceptance: dict[str, Any]) -> bool:
     )
 
 
+def phase_a_agent_id(day: str) -> str:
+    """Return a date-scoped synthetic ID; this is not a persistent trading agent."""
+    return f"phasea{day.replace('-', '')}"
+
+
+def validate_evidence_consistency(evidence: dict[str, Any]) -> bool:
+    """Reject evidence whose reported counts or provenance disagree."""
+    return (
+        evidence.get("transport") == "NullTransport"
+        and evidence.get("intent_count") == evidence.get("null_transport_place_calls")
+        and evidence.get("intent_count") == evidence.get("journal_event_count")
+        and evidence.get("workflow_run_id") not in (None, "", "local")
+        and evidence.get("workflow_event") in ("schedule", "workflow_dispatch")
+        and evidence.get("sequence_scope") == "daily_synthetic_validation"
+        and evidence.get("sequence_continuity_proven") is False
+        and acceptance_passes(evidence.get("acceptance", {}))
+    )
+
+
 async def run_shadow() -> dict:
     now = datetime.now(timezone.utc)
     day = now.date().isoformat()
@@ -35,14 +54,17 @@ async def run_shadow() -> dict:
     if path.exists():
         raise RuntimeError(f"E_EVIDENCE_EXISTS: {path}")
 
+    # This temporary journal validates today's shadow path only. It is not the
+    # durable production journal and must not be used to claim cross-day seq continuity.
     journal_path = EVIDENCE_DIR / f".{day}.jsonl"
     transport = NullTransport()
     journal = Journal(journal_path)
     executor = DemoExecutor(transport, demo_phase="A", enabled=True, journal=journal)
+    agent_id = phase_a_agent_id(day)
 
     results = []
     for seq in (1, 2, 3):
-        intent = Intent.create("phase-a-shadow", SYMBOL, "buy", "daily-shadow-validation", seq)
+        intent = Intent.create(agent_id, SYMBOL, "buy", "daily-shadow-validation", seq)
         result = await executor.submit(intent)
         results.append({
             "seq": seq,
@@ -53,30 +75,47 @@ async def run_shadow() -> dict:
         })
 
     rows = journal.read()
+    counts_consistent = len(results) == transport.place_calls == len(rows)
     evidence = {
-        "schema": "phase-a-evidence.v1",
+        "schema": "phase-a-evidence.v2",
         "date_utc": day,
         "recorded_at_utc": now.isoformat(),
         "git_sha": os.getenv("GITHUB_SHA", "local"),
+        "workflow_run_id": os.getenv("GITHUB_RUN_ID", "local"),
+        "workflow_run_attempt": os.getenv("GITHUB_RUN_ATTEMPT", "local"),
+        "workflow_event": os.getenv("GITHUB_EVENT_NAME", "local"),
         "phase": "A",
         "symbol": SYMBOL,
-        "transport": "NullTransport",
+        "transport": type(transport).__name__,
         "exchange_touched": False,
         "exchange_mutation_calls": 0,
+        "exchange_order_call_observation": {
+            "value": 0,
+            "basis": "structural",
+            "details": (
+                "DemoExecutor accepts only NullTransport in Phase A; NullTransport "
+                "has no exchange client. This is a structural guarantee, not external "
+                "network telemetry."
+            ),
+        },
         "null_transport_place_calls": transport.place_calls,
         "intent_count": len(results),
         "journal_event_count": len(rows),
+        "counts_consistent": counts_consistent,
+        "agent_id": agent_id,
+        "sequence_scope": "daily_synthetic_validation",
+        "sequence_continuity_proven": False,
         "results": results,
         "incidents": [],
         "acceptance": {
             "daily_shadow_run": all(r["accepted"] and r["code"] == "SHADOW" for r in results),
-            "null_transport_only": transport.place_calls == 3,
+            "null_transport_only": isinstance(transport, NullTransport) and counts_consistent,
             "unexpected_exchange_order_calls": 0,
             "unresolved_incidents": 0,
         },
     }
 
-    if not acceptance_passes(evidence["acceptance"]):
+    if not validate_evidence_consistency(evidence):
         raise RuntimeError("E_PHASE_A_DAILY_GATE")
 
     path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
