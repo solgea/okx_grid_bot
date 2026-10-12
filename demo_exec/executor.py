@@ -56,7 +56,7 @@ class DemoExecutor:
         self._seen.add(key)
         try:
             result = await self.transport.place(intent)
-        except TimeoutError:
+        except (TimeoutError, ConnectionError):
             self._stopped = True
             if self.journal:
                 self.journal.append({"event":"UNKNOWN","agent_id":intent.agent_id,"seq":intent.seq})
