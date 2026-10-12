@@ -35,12 +35,23 @@ def phase_a_agent_id(day: str) -> str:
 def validate_evidence_consistency(evidence: dict[str, Any]) -> bool:
     """Reject evidence whose reported counts or provenance disagree."""
     event = evidence.get("workflow_event")
+    run_id = evidence.get("workflow_run_id")
+    if event in ("schedule", "workflow_dispatch"):
+        provenance_valid = run_id not in (None, "", "local")
+    elif event == "local":
+        provenance_valid = (
+            run_id == "local"
+            and evidence.get("workflow_run_attempt") == "local"
+            and evidence.get("git_sha") == "local"
+        )
+    else:
+        provenance_valid = False
+
     return (
         evidence.get("transport") == "NullTransport"
         and evidence.get("intent_count") == evidence.get("null_transport_place_calls")
         and evidence.get("intent_count") == evidence.get("journal_event_count")
-        and evidence.get("workflow_run_id") not in (None, "")
-        and event in ("schedule", "workflow_dispatch", "local")
+        and provenance_valid
         and evidence.get("sequence_scope") == "daily_synthetic_validation"
         and evidence.get("sequence_continuity_proven") is False
         and acceptance_passes(evidence.get("acceptance", {}))
