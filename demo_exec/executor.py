@@ -41,11 +41,11 @@ class DemoExecutor:
             return SubmitResult(False, "E_NOT_DEMO", LifecycleState.NEW.value, cl_id)
         if not self.enabled:
             return SubmitResult(False, "E_DISABLED", LifecycleState.NEW.value, cl_id)
-        if self._stopped:
-            return SubmitResult(False, "E_AGENT_STATE", LifecycleState.UNKNOWN.value, cl_id)
         key = (intent.agent_id, intent.seq)
         if key in self._seen:
             return SubmitResult(False, "E_JOURNAL", LifecycleState.NEW.value, cl_id)
+        if self._stopped:
+            return SubmitResult(False, "E_AGENT_STATE", LifecycleState.UNKNOWN.value, cl_id)
         if intent.seq < 1:
             return SubmitResult(False, "E_LIMIT", LifecycleState.NEW.value, cl_id)
         if self.journal:
