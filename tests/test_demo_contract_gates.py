@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from demo_exec.lifecycle import Lifecycle, LifecycleState
+from demo_exec.journal import Journal
 from demo_exec.executor import DemoExecutor
 from demo_exec.intent import Intent
 from demo_exec.promotion import Promotion, PromotionCheck, PromotionState
@@ -42,6 +43,55 @@ def test_t02_create_order_only_transport():
 def test_t03_phase_a_rejects_real_transport():
     with pytest.raises(RuntimeError, match="E_PHASE_LOCK"):
         OkxDemoTransport(object(), demo_phase="A", is_demo=True)
+
+
+@pytest.mark.asyncio
+async def test_t06_journal_prevents_seq_reuse_after_restart(tmp_path):
+    journal = Journal(tmp_path / "events.jsonl")
+    intent = Intent.create("agent1", "ETH/USDT:USDT", "buy", "T06 restart", 7)
+    first_transport = NullTransport()
+    first = DemoExecutor(first_transport, journal=journal)
+    assert (await first.submit(intent)).accepted
+    assert first_transport.place_calls == 1
+
+    restarted_transport = NullTransport()
+    restarted = DemoExecutor(restarted_transport, journal=journal)
+    result = await restarted.submit(intent)
+    assert result.code == "E_JOURNAL"
+    assert restarted_transport.place_calls == 0
+
+
+class TimeoutNullTransport(NullTransport):
+    async def place(self, intent):
+        self.place_calls += 1
+        raise TimeoutError("simulated timeout")
+
+
+@pytest.mark.asyncio
+async def test_t07_timeout_records_unknown_and_does_not_retry():
+    transport = TimeoutNullTransport()
+    executor = DemoExecutor(transport)
+    intent = Intent.create("agent1", "ETH/USDT:USDT", "buy", "T07 timeout", 8)
+
+    result = await executor.submit(intent)
+    assert result.state == LifecycleState.UNKNOWN.value
+    retry = await executor.submit(intent)
+    assert retry.code == "E_JOURNAL"
+    assert transport.place_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_t08_unresolved_unknown_stops_agent():
+    transport = TimeoutNullTransport()
+    executor = DemoExecutor(transport)
+    first = Intent.create("agent1", "ETH/USDT:USDT", "buy", "T08 timeout", 9)
+    second = Intent.create("agent1", "ETH/USDT:USDT", "buy", "T08 blocked follow-up", 10)
+
+    result = await executor.submit(first)
+    assert result.state == LifecycleState.UNKNOWN.value
+    blocked = await executor.submit(second)
+    assert blocked.code == "E_AGENT_STATE"
+    assert transport.place_calls == 1
 
 def test_t06_persisted_seq_is_recovered():
     path = ROOT / "tests" / ".tmp-demo-journal.jsonl"
