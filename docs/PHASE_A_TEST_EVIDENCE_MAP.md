@@ -1,6 +1,6 @@
 # Phase A Contract Test Evidence Map
 
-Status: **CI verification pending**. This map identifies the contract test(s) for every Phase A-required test ID. A PASS must be recorded only from a successful CI run on the commit containing this map and tests.
+Status: **Required test set verified on code commit `38a52b1bfff5d5814bc1c23d1ae453f4b872f3ce`**. This map identifies the contract test(s) for every Phase A-required test ID. The successful CI run below executed the full test suite and read-only runtime smoke check.
 
 Safety scope: unit tests use `NullTransport`, in-memory/fake objects, and isolated temporary journal files. The test suite must not invoke the legacy `scripts/g9_demo_order.py` CLI. No order placement, cancellation, leverage change, or margin-mode change is permitted in this workflow.
 
@@ -23,8 +23,9 @@ Safety scope: unit tests use `NullTransport`, in-memory/fake objects, and isolat
 
 ## Evidence record
 
-- Test commit SHA: filled after CI completes.
-- CI run URL: filled after CI completes.
-- Required test result: **PENDING** until CI proves the listed tests pass.
-- OKX Demo read-only assumptions record: produced separately by `.github/workflows/okx-demo-assumptions-readonly.yml`. `UNVERIFIED_READ_ONLY` and `NO_DATA` are recorded as such; they are not rewritten as PASS.
-- Phase A acceptance: **NOT GRANTED by this map alone**. The three consecutive daily records, all required tests, zero mutation calls, zero unresolved incidents, and Section 11 record must all be independently verified.
+- Tested code commit SHA: `38a52b1bfff5d5814bc1c23d1ae453f4b872f3ce`.
+- CI run #260: https://github.com/solgea/okx_grid_bot/actions/runs/38242245197 — **PASS**, 205 tests passed; compile, Docker build, and read-only OKX runtime smoke passed.
+- OKX assumptions workflow run #9: https://github.com/solgea/okx_grid_bot/actions/runs/38242245161 — **PASS** (`summary.failed=[]`). The result contains explicit `NO_DATA` / `UNVERIFIED_READ_ONLY` items; these are not rewritten as PASS.
+- Committed Section 11 record: `artifacts/phase_a/okx-demo-assumptions-readonly-2026-10-12.json`.
+- Artifact copy: https://github.com/solgea/okx_grid_bot/actions/runs/38242245161/artifacts/11743376138
+- Phase A acceptance: **NOT GRANTED by this map alone**. The three consecutive daily records, zero unexpected mutation calls, zero unresolved incidents, and committed Section 11 record must still be reviewed together on the target branch.
