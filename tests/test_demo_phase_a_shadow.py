@@ -184,6 +184,17 @@ def test_phase_a_evidence_consistency_rejects_mismatch_or_weak_provenance(overri
     assert validate_evidence_consistency(evidence) is False
 
 
+def test_phase_a_evidence_consistency_accepts_coherent_local_record():
+    evidence = valid_evidence()
+    evidence.update({
+        "workflow_run_id": "local",
+        "workflow_run_attempt": "local",
+        "workflow_event": "local",
+        "git_sha": "local",
+    })
+    assert validate_evidence_consistency(evidence) is True
+
+
 def test_phase_a_agent_ids_are_date_scoped_and_synthetic():
     first = phase_a_agent_id("2026-10-12")
     next_day = phase_a_agent_id("2026-10-13")
