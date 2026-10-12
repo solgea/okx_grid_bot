@@ -5,12 +5,27 @@ from pathlib import Path
 import pytest
 
 from demo_exec.lifecycle import Lifecycle, LifecycleState
+from demo_exec.executor import DemoExecutor
+from demo_exec.intent import Intent
 from demo_exec.promotion import Promotion, PromotionCheck, PromotionState
 from demo_exec.recovery import Recovery
 from demo_exec.reconciler import ShadowReconciler
-from demo_exec.transport import OkxDemoTransport
+from demo_exec.transport import NullTransport, OkxDemoTransport
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.asyncio
+async def test_t01_non_demo_submit_is_rejected_before_transport():
+    transport = NullTransport()
+    executor = DemoExecutor(transport, is_demo=False)
+    intent = Intent.create("agent1", "ETH/USDT:USDT", "buy", "T01 non-demo guard", 1)
+
+    result = await executor.submit(intent)
+
+    assert result.accepted is False
+    assert result.code == "E_NOT_DEMO"
+    assert transport.place_calls == 0
 
 def test_t02_create_order_only_transport():
     violations = []
