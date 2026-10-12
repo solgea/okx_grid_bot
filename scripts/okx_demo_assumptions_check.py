@@ -63,7 +63,12 @@ async def _check(name: str, fn, results: dict[str, Any], secrets: tuple[str, ...
 async def run_checks(exchange: Any, symbol: str, secrets: tuple[str, ...] = ()) -> dict[str, Any]:
     market = exchange.market(symbol)
     inst_id = market["id"]
-    results: dict[str, Any] = {"inst_id": inst_id}
+    market_info = market.get("info") or {}
+    inst_family = market_info.get("instFamily") or (
+        f"{market.get('base')}-{market.get('quote')}"
+        if market.get("base") and market.get("quote") else None
+    )
+    results: dict[str, Any] = {"inst_id": inst_id, "inst_family": inst_family}
 
     async def position_mode():
         row = _row(await exchange.privateGetAccountConfig({}))
@@ -80,7 +85,9 @@ async def run_checks(exchange: Any, symbol: str, secrets: tuple[str, ...] = ()) 
         return {"status": "OK", "query": "reachable", "pending_conditional_orders": len(data or [])}
 
     async def fee_rates():
-        row = _row(await exchange.privateGetAccountTradeFee({"instType": "SWAP", "instId": inst_id}))
+        if not inst_family:
+            raise ValueError("instFamily unavailable for SWAP fee-rate query")
+        row = _row(await exchange.privateGetAccountTradeFee({"instType": "SWAP", "instFamily": inst_family}))
         return {"status": "OK" if row else "FAIL", "maker": row.get("maker"), "taker": row.get("taker")}
 
     async def fills_fee_fields():
