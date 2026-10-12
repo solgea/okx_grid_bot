@@ -11,9 +11,9 @@ Safety scope: unit tests use `NullTransport`, in-memory/fake objects, and isolat
 | T03 | `tests/test_demo_contract_gates.py::test_t03_phase_a_rejects_real_transport` | Phase A cannot construct OKX transport |
 | T04 | `tests/test_execution_authorization.py::test_rejected_preflight_cannot_reach_execution_boundary`; `tests/test_execution_safety.py::test_preflight_rejects_stale_market` | Rejected/stale preflight does not cross execution boundary |
 | T05 | `tests/test_demo_phase_a_shadow.py::test_duplicate_agent_seq_is_rejected` | Duplicate `(agent_id, seq)` returns `E_JOURNAL` |
-| T06 | `tests/test_demo_contract_gates.py::test_t06_persisted_seq_is_recovered`; `tests/test_demo_phase_a_shadow.py::test_write_ahead_journal` | Persisted sequence/journal evidence is retained |
-| T07 | `tests/test_demo_contract_gates.py::test_t07_timeout_is_unknown_and_not_resubmitted` | Timeout becomes UNKNOWN; retry transition is rejected |
-| T08 | `tests/test_demo_contract_gates.py::test_t08_unresolved_unknown_stops_progress` | Unresolved UNKNOWN cannot transition to FILLED |
+| T06 | `tests/test_demo_contract_gates.py::test_t06_journal_prevents_seq_reuse_after_restart` | Restarted executor reads the journal and rejects reuse of the same `(agent_id, seq)` without another transport call |
+| T07 | `tests/test_demo_contract_gates.py::test_t07_timeout_records_unknown_and_does_not_retry` | Simulated NullTransport timeout returns UNKNOWN and the same intent is not sent again |
+| T08 | `tests/test_demo_contract_gates.py::test_t08_unresolved_unknown_stops_agent` | A simulated unresolved UNKNOWN blocks a subsequent intent; no further transport call occurs |
 | T14 | `tests/test_demo_contract_gates.py::test_t14_mismatch_stops_without_repair` | Reconciliation mismatch stops; no auto-repair |
 | T15 | `tests/test_demo_contract_gates.py::test_t15_unmanaged_order_is_untouched` | Unmanaged order is ignored and not modified |
 | T23 | `tests/test_demo_contract_gates.py::test_t23_failed_promotion_stays_paper` | Failed promotion remains PAPER |
