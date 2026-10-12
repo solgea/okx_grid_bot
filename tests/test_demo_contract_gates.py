@@ -192,3 +192,36 @@ def test_t10_lifecycle_rejection_is_terminal():
     assert lifecycle.state is LifecycleState.REJECTED
     with pytest.raises(ValueError):
         lifecycle.transition(LifecycleState.SUBMITTED)
+
+
+def test_t09_cancel_confirmation_is_terminal():
+    lifecycle = Lifecycle()
+    lifecycle.transition(LifecycleState.SUBMITTED)
+    lifecycle.transition(LifecycleState.ACKED)
+    lifecycle.transition(LifecycleState.OPEN)
+    lifecycle.transition(LifecycleState.CANCEL_SENT)
+    lifecycle.transition(LifecycleState.CANCEL_CONFIRMED)
+    with pytest.raises(ValueError):
+        lifecycle.transition(LifecycleState.FILLED)
+
+
+@pytest.mark.parametrize("fill_state", [LifecycleState.PARTIAL, LifecycleState.FILLED])
+def test_t09_fill_observed_during_cancel_wins_race(fill_state):
+    lifecycle = Lifecycle()
+    lifecycle.transition(LifecycleState.SUBMITTED)
+    lifecycle.transition(LifecycleState.ACKED)
+    lifecycle.transition(LifecycleState.OPEN)
+    lifecycle.transition(LifecycleState.CANCEL_SENT)
+    lifecycle.transition(fill_state)
+    assert lifecycle.state is fill_state
+
+
+def test_t09_unresolved_cancel_becomes_unknown_and_stops_progress():
+    lifecycle = Lifecycle()
+    lifecycle.transition(LifecycleState.SUBMITTED)
+    lifecycle.transition(LifecycleState.ACKED)
+    lifecycle.transition(LifecycleState.OPEN)
+    lifecycle.transition(LifecycleState.CANCEL_SENT)
+    lifecycle.transition(LifecycleState.UNKNOWN)
+    with pytest.raises(ValueError):
+        lifecycle.transition(LifecycleState.CANCEL_CONFIRMED)
