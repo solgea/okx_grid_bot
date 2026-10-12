@@ -153,3 +153,42 @@ def test_t26_seq_gap_blocks(tmp_path):
     path.write_text(json.dumps({"seq": 1}) + "\n" + json.dumps({"seq": 3}) + "\n", encoding="utf-8")
     result = Recovery().recover(str(path))
     assert result.state == "BLOCKED" and result.reason == "E_SEQ_GAP"
+
+
+class ConnectionDropNullTransport(NullTransport):
+    async def place(self, intent):
+        self.place_calls += 1
+        raise ConnectionError("simulated connection drop after submit")
+
+
+@pytest.mark.asyncio
+async def test_t27_connection_drop_fails_closed_as_unknown_without_retry():
+    transport = ConnectionDropNullTransport()
+    executor = DemoExecutor(transport)
+    first = Intent.create("agent1", "ETH/USDT:USDT", "buy", "T27 connection drop", 27)
+
+    result = await executor.submit(first)
+
+    assert result.state == LifecycleState.UNKNOWN.value
+    retry = await executor.submit(first)
+    assert retry.code == "E_JOURNAL"
+    assert transport.place_calls == 1
+
+
+def test_t10_lifecycle_accepts_partial_fill_to_filled():
+    lifecycle = Lifecycle()
+    lifecycle.transition(LifecycleState.SUBMITTED)
+    lifecycle.transition(LifecycleState.ACKED)
+    lifecycle.transition(LifecycleState.OPEN)
+    lifecycle.transition(LifecycleState.PARTIAL)
+    lifecycle.transition(LifecycleState.FILLED)
+    assert lifecycle.state is LifecycleState.FILLED
+
+
+def test_t10_lifecycle_rejection_is_terminal():
+    lifecycle = Lifecycle()
+    lifecycle.transition(LifecycleState.SUBMITTED)
+    lifecycle.transition(LifecycleState.REJECTED)
+    assert lifecycle.state is LifecycleState.REJECTED
+    with pytest.raises(ValueError):
+        lifecycle.transition(LifecycleState.SUBMITTED)
