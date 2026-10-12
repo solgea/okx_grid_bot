@@ -67,3 +67,45 @@ def test_validator_uses_policy_max_leverage():
     result = validator.validate(intent, metadata, account, market)
 
     assert result.passed is False
+
+
+def test_t27_stale_market_data_is_rejected_offline():
+    import time
+    from decimal import Decimal
+    from preflight_layer.domain import AccountState, InstrumentMetadata, MarketData, OrderIntent, OrderSide, OrderType
+
+    policy = RiskPolicy(
+        max_position_size=0.1,
+        max_drawdown_pct=20.0,
+        max_daily_loss_usdt=500.0,
+        market_data_max_age_sec=1.0,
+        max_leverage=2.0,
+    )
+    intent = OrderIntent(
+        instrument_id="ETH/USDT:USDT",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+        price=Decimal("2500"),
+        size=Decimal("0.01"),
+        leverage=Decimal("2"),
+    )
+    metadata = InstrumentMetadata(
+        symbol="ETH/USDT:USDT",
+        min_size=Decimal("0.01"),
+        tick_size=Decimal("0.01"),
+        lot_size=Decimal("0.01"),
+        contract_val=Decimal("1"),
+        is_live=True,
+    )
+    account = AccountState(
+        balance=Decimal("1000"),
+        available_margin=Decimal("1000"),
+        leverage=Decimal("2"),
+    )
+    stale_market = MarketData(last=Decimal("2500"), timestamp=time.time() - 5.0)
+
+    result = PreFlightValidator(policy=policy).validate(intent, metadata, account, stale_market)
+
+    assert result.passed is False
+    assert result.rejection_code == "PF025"
+    assert "stale" in result.message.lower()
