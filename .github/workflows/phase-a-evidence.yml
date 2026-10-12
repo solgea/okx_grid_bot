@@ -23,19 +23,37 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Run controlled Phase-A shadow evidence
         run: python scripts/record_phase_a_evidence.py
-      - name: Verify evidence is mutation-free
+      - name: Verify evidence provenance and internal consistency
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
           from datetime import datetime, timezone
+
           p = Path("artifacts/phase_a") / f"{datetime.now(timezone.utc).date().isoformat()}.json"
           d = json.loads(p.read_text())
+          assert d["schema"] == "phase-a-evidence.v2"
           assert d["phase"] == "A"
           assert d["transport"] == "NullTransport"
           assert d["exchange_touched"] is False
           assert d["exchange_mutation_calls"] == 0
+          assert d["exchange_order_call_observation"]["value"] == 0
+          assert d["exchange_order_call_observation"]["basis"] == "structural"
+          assert d["workflow_run_id"] == os.environ["GITHUB_RUN_ID"]
+          assert d["workflow_run_attempt"] == os.environ["GITHUB_RUN_ATTEMPT"]
+          assert d["workflow_event"] == os.environ["GITHUB_EVENT_NAME"]
+          assert d["workflow_event"] in ("schedule", "workflow_dispatch")
+          assert d["git_sha"] == os.environ["GITHUB_SHA"]
+          assert d["intent_count"] == d["null_transport_place_calls"] == d["journal_event_count"] == 3
+          assert d["counts_consistent"] is True
+          assert d["sequence_scope"] == "daily_synthetic_validation"
+          assert d["sequence_continuity_proven"] is False
+          assert d["acceptance"]["daily_shadow_run"] is True
+          assert d["acceptance"]["null_transport_only"] is True
+          assert d["acceptance"]["unexpected_exchange_order_calls"] == 0
           assert d["acceptance"]["unresolved_incidents"] == 0
+          assert d["incidents"] == []
           print("PHASE_A_EVIDENCE=PASS")
           PY
       - name: Commit daily evidence
