@@ -69,6 +69,19 @@ def test_run_checks_reports_values_and_marks_unprovable_items():
     assert chk.summarize(res)["failed"] == []
 
 
+
+def test_empty_swap_fee_rates_are_recorded_as_no_data():
+    class EmptyFeeExchange(FakeExchange):
+        async def privateGetAccountTradeFee(self, p):
+            return await self._get("fee", {"data": [{"maker": "", "taker": ""}]}, p)
+
+    ex = EmptyFeeExchange()
+    chk.harden(ex)
+    res = run(chk.run_checks(ex, "ETH/USDT:USDT"))
+    assert res["fee_rates"]["status"] == "NO_DATA"
+    assert "fee_rates" in chk.summarize(res)["unverified"]
+    assert chk.summarize(res)["failed"] == []
+
 def test_failures_are_isolated_and_secrets_are_scrubbed():
     ex = FakeExchange(fail={"algo"}); chk.harden(ex)
     res = run(chk.run_checks(ex, "ETH/USDT:USDT", secrets=("secret-key",)))
