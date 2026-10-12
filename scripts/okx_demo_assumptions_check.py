@@ -88,7 +88,13 @@ async def run_checks(exchange: Any, symbol: str, secrets: tuple[str, ...] = ()) 
         if not inst_family:
             raise ValueError("instFamily unavailable for SWAP fee-rate query")
         row = _row(await exchange.privateGetAccountTradeFee({"instType": "SWAP", "instFamily": inst_family}))
-        return {"status": "OK" if row else "FAIL", "maker": row.get("maker"), "taker": row.get("taker")}
+        if not row:
+            return {"status": "FAIL", "note": "fee-rate endpoint returned no row"}
+        maker, taker = row.get("maker"), row.get("taker")
+        if not maker and not taker:
+            return {"status": "NO_DATA", "maker": maker, "taker": taker,
+                    "note": "endpoint reachable but Demo response did not include usable fee rates"}
+        return {"status": "OK", "maker": maker, "taker": taker}
 
     async def fills_fee_fields():
         data = (await exchange.privateGetTradeFills({"instType": "SWAP", "limit": "5"})).get("data") or []
