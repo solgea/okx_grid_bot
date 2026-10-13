@@ -176,3 +176,35 @@ async def test_t09_executor_stops_on_unknown_status_without_fill_regression():
     )
     assert blocked.accepted is False
     assert blocked.code == "E_AGENT_STATE"
+
+
+@pytest.mark.asyncio
+async def test_t09_restart_fails_closed_after_persisted_order_event(tmp_path):
+    """Restart must not guess order reality from an incomplete event journal."""
+    from demo_exec.executor import DemoExecutor
+    from demo_exec.intent import Intent
+    from demo_exec.journal import Journal
+    from demo_exec.transport import NullTransport
+
+    journal = Journal(tmp_path / "events.jsonl")
+    executor = DemoExecutor(NullTransport(), journal=journal)
+    first = await executor.submit(
+        Intent.create("agent1", "ETH/USDT:USDT", "buy", "restart event", 201)
+    )
+    assert first.accepted is True
+    assert executor.handle_order_event(
+        first.client_order_id,
+        OrderEvent("restart-ack", LifecycleState.ACKED, Decimal("0")),
+    ) is True
+    assert executor.handle_order_event(
+        first.client_order_id,
+        OrderEvent("restart-open", LifecycleState.OPEN, Decimal("0")),
+    ) is True
+
+    recovered = DemoExecutor(NullTransport(), journal=journal)
+    result = await recovered.submit(
+        Intent.create("agent1", "ETH/USDT:USDT", "buy", "must fail closed", 202)
+    )
+    assert result.accepted is False
+    assert result.code == "E_AGENT_STATE"
+    assert result.state == LifecycleState.UNKNOWN.value
