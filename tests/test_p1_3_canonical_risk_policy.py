@@ -110,5 +110,5 @@ def test_t27_stale_market_data_is_rejected_offline(monkeypatch):
     result = PreFlightValidator(policy=policy).validate(intent, metadata, account, stale_market)
 
     assert result.passed is False
-    assert result.rejection_code == "PF025"
+    assert result.rejection_code == "PF025_STALE_MARKET_DATA"
     assert "stale" in result.message.lower()
