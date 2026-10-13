@@ -55,7 +55,7 @@ class ProtectionDeadline:
     def position_detected(self, now: float) -> bool:
         """Start the clock once; duplicate detections cannot reset the deadline."""
         timestamp = self._finite(now, "now")
-        if self.detected_at is not None:
+        if self.detected_at is not None or self.status is ProtectionStatus.EXPIRED:
             return False
         self.detected_at = timestamp
         self.status = ProtectionStatus.UNPROTECTED
