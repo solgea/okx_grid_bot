@@ -235,3 +235,43 @@ def test_t09_unresolved_cancel_becomes_unknown_and_stops_progress():
     lifecycle.transition(LifecycleState.UNKNOWN)
     with pytest.raises(ValueError):
         lifecycle.transition(LifecycleState.CANCEL_CONFIRMED)
+
+@pytest.mark.parametrize(
+    "exchange_position",
+    [
+        {"symbol": "ETH/USDT:USDT", "size": "1.5", "state": "OPEN"},
+        {"symbol": "ETH/USDT:USDT", "size": "1", "state": "FLAT"},
+    ],
+    ids=["position-size-mismatch", "position-state-mismatch"],
+)
+def test_t16_position_integrity_mismatch_stops_without_repair(exchange_position):
+    """Position size/state disagreement must fail closed; no repair is attempted."""
+    local_position = {
+        "symbol": "ETH/USDT:USDT",
+        "size": "1",
+        "state": "OPEN",
+    }
+
+    result = ShadowReconciler().reconcile(
+        local_state=local_position,
+        exchange_state=exchange_position,
+    )
+
+    assert result.matched is False
+    assert result.code == "E_RECONCILIATION"
+    assert result.stopped is True
+
+
+def test_t16_matching_position_size_and_state_reconciles():
+    """A fully matching position snapshot is the only matching case here."""
+    position = {"symbol": "ETH/USDT:USDT", "size": "1", "state": "OPEN"}
+
+    result = ShadowReconciler().reconcile(
+        local_state=position,
+        exchange_state=position.copy(),
+    )
+
+    assert result.matched is True
+    assert result.code == "MATCH"
+    assert result.stopped is False
+
