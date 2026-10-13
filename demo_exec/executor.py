@@ -116,6 +116,8 @@ class DemoExecutor:
             self._stop_for_unknown_order(client_order_id)
         try:
             accepted = processor.process(event)
+            if event.state is LifecycleState.UNKNOWN:
+                self._stopped = True
             if accepted and self.journal:
                 self.journal.append({
                     "event": "ORDER_EVENT",
