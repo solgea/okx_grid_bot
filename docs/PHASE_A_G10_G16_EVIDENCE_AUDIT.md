@@ -2,6 +2,7 @@
 
 **Audit baseline commit:** `04514196dcbf0a833faef01e768be309985c2231`  
 **Baseline CI:** [Run #274](https://github.com/solgea/okx_grid_bot/actions/runs/38250649833) — completed / success  
+**PR-head CI:** [Run #284](https://github.com/solgea/okx_grid_bot/actions/runs/38342779388) — completed / success on `3bf0a51d7a381df7fcddf28d67b21a1fa67726d1`  
 **Scope:** documentation and evidence traceability only. No exchange orders, no runtime mode changes, and no gate promotion.
 
 ## Baseline CI evidence
@@ -13,7 +14,7 @@ Run #274 executed the following successful steps on the baseline commit:
 - Docker build
 - Docker runtime smoke (OKX Demo read-only)
 
-This is repository CI evidence. It is **not** evidence that G10–G16 have passed, nor does it establish three consecutive Phase A shadow days.
+Run #284 passed dependency installation, compile, tests, Docker build and Docker runtime smoke (OKX Demo read-only) for the PR head SHA above. These are repository CI checks, not proof that G10–G16 have passed, and do not establish three consecutive Phase A shadow days. Run #284 has no downloadable workflow artifact; runtime smoke is evidenced by the successful job step/log.
 
 ## Phase A: inspected repository records
 
@@ -42,12 +43,12 @@ The associated workflow run #9 job and artifact-upload step succeeded. Artifact 
 | Phase A evidence provenance and count consistency | `scripts/record_phase_a_evidence.py`, `tests/test_demo_phase_a_shadow.py`, `.github/workflows/phase-a-evidence.yml` | Runs #7/#8/#9 succeeded and match the records' embedded SHAs; each run has no downloadable artifact; counts are 3/3/3 | Current v2 provenance and cross-day sequence continuity; daily JSON remains v1 |
 | OKX assumptions check is read-only | `scripts/okx_demo_assumptions_check.py`, `tests/test_okx_assumptions_check.py`, `.github/workflows/okx-demo-assumptions-readonly.yml` | Run #9 and artifact #11743376138 inspected; archive/member SHA recorded above; mock tests assert mutation calls are blocked | Live exchange semantics marked `UNVERIFIED_READ_ONLY` remain unproven; no mutating request may be used to prove assumptions |
 | G8.6 preflight authorization | `agent/GATE_PLAN.md` and existing preflight implementation/tests | Gate requirement documented | Link each positive/negative preflight case to exact test and CI result |
-| G10 order lifecycle (T09–T13) | `demo_exec/lifecycle.py`; `tests/test_demo_contract_gates.py` | Added `CANCEL_SENT` / `CANCEL_CONFIRMED`; offline tests cover terminal cancel confirmation, fill-wins-cancel race (`PARTIAL`/`FILLED`), unresolved cancel → `UNKNOWN`, and terminal partial/fill/rejection states | CI pending; state-machine tests do not prove real OKX cancel/fill semantics or partial-fill quantity accounting |
-| G11 reconciliation (T14–T15) | Contract §8–10; `tests/test_demo_contract_gates.py` | `test_t14_mismatch_stops_without_repair`, `test_t15_unmanaged_order_is_untouched` | Exact CI evidence for this branch is pending; no real exchange reconciliation was run |
+| G10 order lifecycle (T09–T13) | `demo_exec/lifecycle.py`; `tests/test_demo_contract_gates.py` | PR-head CI #284 PASS on `3bf0a51d7a381df7fcddf28d67b21a1fa67726d1`; offline tests cover terminal cancel confirmation, fill-wins-cancel race (`PARTIAL`/`FILLED`), unresolved cancel → `UNKNOWN`, and terminal partial/fill/rejection states | State-machine tests do not prove real OKX cancel/fill semantics or partial-fill quantity accounting; delayed fill event after cancel confirmation is not demonstrated |
+| G11 reconciliation (T14–T15) | Contract §8–10; `tests/test_demo_contract_gates.py` | PR-head CI #284 PASS on `3bf0a51d7a381df7fcddf28d67b21a1fa67726d1`; tests include `test_t14_mismatch_stops_without_repair`, `test_t15_unmanaged_order_is_untouched` | No real exchange reconciliation was run; live stale-state reconciliation remains unproven |
 | G12 position integrity | Contract §5, §10 | Contract requirement specified | Explicit test/evidence for position size/state and protection deadline; no live order test |
-| G13 risk / kill switch (T19–T22) | `engine/risk_manager.py`; `tests/test_g10_g16_offline_risk_gates.py` | Added offline tests for drawdown threshold, daily-loss threshold, position-limit breach and latched kill switch | CI pending; emergency cleanup/flatten intentionally not invoked; contract-specific daily-loss accounting still needs separate review |
-| G14 restart recovery (T25–T26) | Contract §8–10; `tests/test_demo_contract_gates.py` | `test_t25_recovery_is_paused`, `test_t26_corrupt_journal_blocks`, `test_t26_seq_gap_blocks` | Exact CI evidence for this branch is pending |
-| G15 failure injection (T27) | Contract §10; `demo_exec/executor.py`; `tests/test_demo_contract_gates.py`; `tests/test_p1_3_canonical_risk_policy.py` | Offline connection-drop test classifies `TimeoutError`/`ConnectionError` as `UNKNOWN` without retry; stale market-data test asserts `PF025` rejection | CI pending; duplicate/delayed response and stale-state/reconciliation injections remain missing |
+| G13 risk / kill switch (T19–T22) | `engine/risk_manager.py`; `tests/test_g10_g16_offline_risk_gates.py` | PR-head CI #284 PASS on `3bf0a51d7a381df7fcddf28d67b21a1fa67726d1`; offline tests cover drawdown, daily-loss threshold, position-limit breach and latched kill switch | Emergency cleanup/flatten intentionally not invoked; contract-specific daily-loss accounting still needs separate review |
+| G14 restart recovery (T25–T26) | Contract §8–10; `tests/test_demo_contract_gates.py` | PR-head CI #284 PASS on `3bf0a51d7a381df7fcddf28d67b21a1fa67726d1`; tests include `test_t25_recovery_is_paused`, `test_t26_corrupt_journal_blocks`, `test_t26_seq_gap_blocks` | No live restart/reconciliation scenario was run |
+| G15 failure injection (T27) | Contract §10; `demo_exec/executor.py`; `tests/test_demo_contract_gates.py`; `tests/test_p1_3_canonical_risk_policy.py` | PR-head CI #284 PASS on `3bf0a51d7a381df7fcddf28d67b21a1fa67726d1`; offline connection-drop test classifies `TimeoutError`/`ConnectionError` as `UNKNOWN` without retry; stale market-data test asserts `PF025_STALE_MARKET_DATA` rejection | Duplicate/delayed response and stale-state/reconciliation injections remain missing |
 | G16 Demo soak | Contract §10 | Acceptance requirement specified | Approved run window, per-order status/cleanup/reconciliation records and incident summary; do not perform a real order merely to close this evidence gap |
 
 ## Safety disposition
@@ -63,5 +64,5 @@ The associated workflow run #9 job and artifact-upload step succeeded. Artifact 
 
 1. Preserve the run-to-record mapping above; the three historical Phase A runs have no downloadable artifacts, so do not fabricate artifact IDs or alter the v1 JSON.
 2. Link each remaining G10–G16 test ID to its exact function and eventual CI run/SHA. G12 position/protection deadline, duplicate/delayed response, stale-state reconciliation and G16 soak evidence remain gaps.
-3. Run CI on this branch and associate results with the exact head SHA. New execution tests use `NullTransport`; risk and preflight tests use offline in-memory fixtures; no exchange call is introduced.
+3. PR-head CI #284 is recorded above against the exact tested SHA. If this audit-document correction is committed, rerun CI and record that new SHA/run as well. Execution tests use `NullTransport`; risk and preflight tests use offline fixtures; no exchange call is introduced.
 4. Re-evaluate gate acceptance only after all required evidence and required human approval are present.
