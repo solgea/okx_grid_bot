@@ -23,7 +23,9 @@ _ALLOWED = {
     LifecycleState.PARTIAL: {LifecycleState.FILLED, LifecycleState.CANCEL_SENT, LifecycleState.CANCELED, LifecycleState.UNKNOWN},
     # A fill observed while cancellation is in flight wins the race.
     LifecycleState.CANCEL_SENT: {LifecycleState.CANCEL_CONFIRMED, LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
-    LifecycleState.CANCEL_CONFIRMED: set(),
+    # Cancel acknowledgement is not proof that no fill event can arrive late.
+    # A delayed fill is authoritative execution evidence and must update state.
+    LifecycleState.CANCEL_CONFIRMED: {LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
 }
 
 
