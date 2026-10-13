@@ -87,7 +87,7 @@ class OrderEventProcessor:
             if self.lifecycle.state not in {LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED}:
                 raise ValueError("cancel confirmation received outside cancel flow")
 
-        if filled < self.cumulative_filled:
+        if filled < self.cumulative_filled and event.state is not LifecycleState.UNKNOWN:
             self._seen_event_ids.add(event.event_id)
             return False
         if self.lifecycle.state is LifecycleState.FILLED:
@@ -119,7 +119,7 @@ class OrderEventProcessor:
             raise ValueError(f"event {event.state.value} invalid in state {self.lifecycle.state.value}")
 
         self._seen_event_ids.add(event.event_id)
-        self.cumulative_filled = filled
+        self.cumulative_filled = max(self.cumulative_filled, filled) if event.state is LifecycleState.UNKNOWN else filled
         if self.lifecycle.state is not event.state:
             self.lifecycle.transition(event.state)
         return True
