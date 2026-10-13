@@ -189,7 +189,7 @@ async def test_t09_restart_fails_closed_after_persisted_order_event(tmp_path):
     journal = Journal(tmp_path / "events.jsonl")
     executor = DemoExecutor(NullTransport(), journal=journal)
     first = await executor.submit(
-        Intent.create("restart-agent", "ETH/USDT:USDT", "buy", "restart event", 201)
+        Intent.create("agent1", "ETH/USDT:USDT", "buy", "restart event", 201)
     )
     assert first.accepted is True
     assert executor.handle_order_event(
@@ -203,7 +203,7 @@ async def test_t09_restart_fails_closed_after_persisted_order_event(tmp_path):
 
     recovered = DemoExecutor(NullTransport(), journal=journal)
     result = await recovered.submit(
-        Intent.create("restart-agent", "ETH/USDT:USDT", "buy", "must fail closed", 202)
+        Intent.create("agent1", "ETH/USDT:USDT", "buy", "must fail closed", 202)
     )
     assert result.accepted is False
     assert result.code == "E_AGENT_STATE"
