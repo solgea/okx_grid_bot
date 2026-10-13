@@ -44,11 +44,13 @@ def test_t17_check_before_position_detection_does_not_start_clock():
     assert guard.detected_at is None
 
 
-def test_t17_missing_detection_cannot_be_marked_protected():
+def test_t17_missing_detection_cannot_be_marked_protected_or_recovered():
     guard = ProtectionDeadline()
     assert guard.confirm_protection(1.0) is False
     assert guard.status is ProtectionStatus.EXPIRED
     assert guard.emergency_action_required is True
+    assert guard.position_detected(2.0) is False
+    assert guard.status is ProtectionStatus.EXPIRED
 
 
 @pytest.mark.parametrize("bad_time", [float("nan"), float("inf"), float("-inf")])
