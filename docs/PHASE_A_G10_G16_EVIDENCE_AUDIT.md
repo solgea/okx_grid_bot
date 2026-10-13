@@ -2,6 +2,7 @@
 
 **Audit baseline commit:** `04514196dcbf0a833faef01e768be309985c2231`  
 **Baseline CI:** [Run #274](https://github.com/solgea/okx_grid_bot/actions/runs/38250649833) — completed / success  
+**PR-head CI:** [Run #288](https://github.com/solgea/okx_grid_bot/actions/runs/38343846568) — completed / success on `ea68512f2ecfc339d5035b7bfa7b2f7027e7343d`  
 **Scope:** documentation and evidence traceability only. No exchange orders, no runtime mode changes, and no gate promotion.
 
 ## Baseline CI evidence
@@ -13,7 +14,7 @@ Run #274 executed the following successful steps on the baseline commit:
 - Docker build
 - Docker runtime smoke (OKX Demo read-only)
 
-This is repository CI evidence. It is **not** evidence that G10–G16 have passed, nor does it establish three consecutive Phase A shadow days.
+Run #288 passed dependency installation, compile, tests, Docker build and Docker runtime smoke (OKX Demo read-only) for the PR head SHA above. These are repository CI checks, not proof that G10–G16 have passed, and do not establish three consecutive Phase A shadow days. Runtime smoke is evidenced by the successful job step/log.
 
 ## Phase A: inspected repository records
 
@@ -27,27 +28,27 @@ The current `main` tree contains three date-named records for consecutive UTC ca
 
 Record links: [2026-10-10](../artifacts/phase_a/2026-10-10.json) · [2026-10-11](../artifacts/phase_a/2026-10-11.json) · [2026-10-12](../artifacts/phase_a/2026-10-12.json).
 
-**Finding:** the repository contains records for three consecutive UTC dates, and each record reports internally matching counts and zero incidents. However, these are schema v1 records and do not contain workflow run ID, attempt, event, or the v2 provenance fields asserted by the current workflow. The current evidence-generation code explicitly sets `sequence_continuity_proven: false` and uses date-scoped synthetic agents. Therefore, these records establish three dated daily synthetic runs, **not** cross-day sequence continuity or full current-workflow provenance. The three-day acceptance criterion remains **NOT VERIFIED** until each date is linked to its authentic workflow run/artifact and validated against the current acceptance contract. Historical records must not be rewritten to retrofit missing provenance.
+**Finding:** GitHub Actions history now links each date to a successful run whose `head_sha` matches the SHA embedded in that day's record. Run #7 was manually dispatched; runs #8 and #9 were scheduled. The workflow exposes **no downloadable artifacts** for these three runs; the JSON evidence was committed to the repository by the workflow. The records are schema v1 and predate the current workflow's v2 provenance assertions. They lack run ID, attempt, event, and current v2 provenance fields; the generator also uses date-scoped synthetic agents and explicitly sets `sequence_continuity_proven: false`. This establishes three successful dated synthetic workflow runs with internally matching counts, but **not** v2 evidence conformance or cross-day sequence continuity. Three-day acceptance remains **NOT VERIFIED**. Do not rewrite historical JSON to retrofit provenance.
 
 ## Read-only OKX result: repository copy reviewed
 
 The committed record [okx-demo-assumptions-readonly-2026-10-12.json](../artifacts/phase_a/okx-demo-assumptions-readonly-2026-10-12.json) identifies tested commit `38a52b1bfff5d5814bc1c23d1ae453f4b872f3ce`, CI run [#38242245197](https://github.com/solgea/okx_grid_bot/actions/runs/38242245197), and read-only workflow run [#38242245161](https://github.com/solgea/okx_grid_bot/actions/runs/38242245161). The repository copy reports instrument metadata, position mode, funding-rate fields and pending-algo query as `OK`; fee rates, fills fee fields, funding bills and several execution semantics remain `NO_DATA`, `DOC_ONLY`, or `UNVERIFIED_READ_ONLY`.
 
-The associated workflow run has a successful job and an artifact metadata entry, but artifact metadata and job success are not the same as independently inspecting the downloadable artifact bytes. The actual downloadable workflow artifact has **not** been independently verified in this audit. Do not upgrade any unverified field to PASS.
+The associated workflow run #9 job and artifact-upload step succeeded. Artifact `11743376138` was downloaded and inspected: ZIP member `okx-demo-assumptions-readonly.json` (2,108 bytes; SHA-256 `dbf09b69fd24c675bfec2f2d141e092213e58e0f718a32c92e9805c17eeb90b9`). The payload confirms `OK` for instrument metadata, position mode, funding rate and pending-algo query, while keeping `attach_algo_orders`, `demo_supports_attached_sl`, `duplicate_cl_ord_id_behavior`, and `reduce_only` as `UNVERIFIED_READ_ONLY`; fees/fill fees/funding bills are `NO_DATA`, and `cl_ord_id_rule` is `DOC_ONLY`. This verifies the artifact bytes and their recorded statuses only; it does not verify the unproven exchange behaviors. Do not upgrade any unverified field to PASS.
 
 ## Contract-to-evidence mapping
 
 | Requirement | Current evidence source | Audit status | What remains unproven |
 |---|---|---|---|
-| Phase A evidence provenance and count consistency | `scripts/record_phase_a_evidence.py`, `tests/test_demo_phase_a_shadow.py`, `.github/workflows/phase-a-evidence.yml` | Daily v1 records show matching counts; current script has provenance checks | Authentic run/artifact links for each date; current v2 provenance and three-day continuity acceptance |
-| OKX assumptions check is read-only | `scripts/okx_demo_assumptions_check.py`, `tests/test_okx_assumptions_check.py`, `.github/workflows/okx-demo-assumptions-readonly.yml` | Mock tests cover read-only hardening; workflow run/job reports success; repository result contains explicit unverified fields | Independently inspect actual workflow artifact bytes; no mutating request may be used to prove assumptions |
+| Phase A evidence provenance and count consistency | `scripts/record_phase_a_evidence.py`, `tests/test_demo_phase_a_shadow.py`, `.github/workflows/phase-a-evidence.yml` | Runs #7/#8/#9 succeeded and match the records' embedded SHAs; each run has no downloadable artifact; counts are 3/3/3 | Current v2 provenance and cross-day sequence continuity; daily JSON remains v1 |
+| OKX assumptions check is read-only | `scripts/okx_demo_assumptions_check.py`, `tests/test_okx_assumptions_check.py`, `.github/workflows/okx-demo-assumptions-readonly.yml` | Run #9 and artifact #11743376138 inspected; archive/member SHA recorded above; mock tests assert mutation calls are blocked | Live exchange semantics marked `UNVERIFIED_READ_ONLY` remain unproven; no mutating request may be used to prove assumptions |
 | G8.6 preflight authorization | `agent/GATE_PLAN.md` and existing preflight implementation/tests | Gate requirement documented | Link each positive/negative preflight case to exact test and CI result |
-| G10 order lifecycle (T09–T13) | `docs/DEMO_EXECUTION_CONTRACT.md` §4, §9; `tests/test_demo_contract_gates.py` | T07/T08 timeout and UNKNOWN safeguards are represented by deterministic tests | T09–T13 cancel confirmation, cancel/fill race, partial fill, rejection and duplicate/delayed response evidence are not demonstrated by the inspected test file |
-| G11 reconciliation (T14–T15) | Contract §8–10; `tests/test_demo_contract_gates.py` | T14 mismatch fail-stop and T15 unmanaged-order ignore tests exist | Preserve test-run evidence tied to the exact PR SHA |
+| G10 order lifecycle (T09–T13) | `demo_exec/lifecycle.py`; `tests/test_demo_contract_gates.py` | PR-head CI #288 PASS on `ea68512f2ecfc339d5035b7bfa7b2f7027e7343d`; offline tests cover terminal cancel confirmation, fill-wins-cancel race (`PARTIAL`/`FILLED`), unresolved cancel → `UNKNOWN`, and terminal partial/fill/rejection states | Offline test `tests/test_delayed_fill_after_cancel.py` verifies `CANCEL_CONFIRMED` → `PARTIAL`/`FILLED`; this exercises the lifecycle transition, not a production event-handler path. Real OKX cancel/fill semantics and partial-fill quantity accounting remain unproven |
+| G11 reconciliation (T14–T15) | Contract §8–10; `tests/test_demo_contract_gates.py` | PR-head CI #288 PASS on `ea68512f2ecfc339d5035b7bfa7b2f7027e7343d`; tests include `test_t14_mismatch_stops_without_repair`, `test_t15_unmanaged_order_is_untouched` | No real exchange reconciliation was run; live stale-state reconciliation remains unproven |
 | G12 position integrity | Contract §5, §10 | Contract requirement specified | Explicit test/evidence for position size/state and protection deadline; no live order test |
-| G13 risk / kill switch (T19–T22) | Contract §6, §9–10 | Contract scenarios specified | Exact deterministic threshold, hard-stop, cleanup and kill-switch tests/results are not demonstrated by the inspected test file |
-| G14 restart recovery (T25–T26) | Contract §8–10; `tests/test_demo_contract_gates.py` | T25 paused recovery and T26 corrupt journal/sequence gap tests exist | Exact CI result associated with the tested SHA |
-| G15 failure injection (T27) | Contract §10 | Scenario specified | Recorded deterministic failure-injection result for connection loss, duplicate response and stale data |
+| G13 risk / kill switch (T19–T22) | `engine/risk_manager.py`; `tests/test_g10_g16_offline_risk_gates.py` | PR-head CI #288 PASS on `ea68512f2ecfc339d5035b7bfa7b2f7027e7343d`; offline tests cover drawdown, daily-loss threshold, position-limit breach and latched kill switch | Emergency cleanup/flatten intentionally not invoked; contract-specific daily-loss accounting still needs separate review |
+| G14 restart recovery (T25–T26) | Contract §8–10; `tests/test_demo_contract_gates.py` | PR-head CI #288 PASS on `ea68512f2ecfc339d5035b7bfa7b2f7027e7343d`; tests include `test_t25_recovery_is_paused`, `test_t26_corrupt_journal_blocks`, `test_t26_seq_gap_blocks` | No live restart/reconciliation scenario was run |
+| G15 failure injection (T27) | Contract §10; `demo_exec/executor.py`; `tests/test_demo_contract_gates.py`; `tests/test_p1_3_canonical_risk_policy.py` | PR-head CI #288 PASS on `ea68512f2ecfc339d5035b7bfa7b2f7027e7343d`; offline connection-drop test classifies `TimeoutError`/`ConnectionError` as `UNKNOWN` without retry; stale market-data test asserts `PF025_STALE_MARKET_DATA` rejection | Duplicate/delayed response and stale-state/reconciliation injections remain missing |
 | G16 Demo soak | Contract §10 | Acceptance requirement specified | Approved run window, per-order status/cleanup/reconciliation records and incident summary; do not perform a real order merely to close this evidence gap |
 
 ## Safety disposition
@@ -61,9 +62,7 @@ The associated workflow run has a successful job and an artifact metadata entry,
 
 ## Next evidence-only work
 
-1. Retrieve and verify the authentic workflow run/artifact for each of the three daily records; match date, run ID/attempt, commit SHA and artifact digest without changing the historical JSON.
-2. Link every G10–G16 test ID to the exact test function, run, SHA, result and acceptance criterion. A filename or generic CI PASS is not sufficient.
-3. Add missing deterministic mocked/failure-injection tests before considering any gate acceptance. Such tests must run offline and be incapable of reaching an exchange.
-4. Inspect the downloadable read-only artifact bytes if the available connection permits; otherwise explicitly retain the result as not independently artifact-verified.
-5. Run CI and associate the resulting PR head SHA and CI run URL with the review record.
-6. Re-evaluate gate acceptance only after all required evidence and the required human approval are present.
+1. Preserve the run-to-record mapping above; the three historical Phase A runs have no downloadable artifacts, so do not fabricate artifact IDs or alter the v1 JSON.
+2. Link each remaining G10–G16 test ID to its exact function and eventual CI run/SHA. G12 position/protection deadline, duplicate/delayed response, stale-state reconciliation and G16 soak evidence remain gaps.
+3. PR-head CI #288 is recorded above against the exact tested SHA. If this audit-document correction is committed, rerun CI and record that new SHA/run as well. Execution tests use `NullTransport`; risk and preflight tests use offline fixtures; no exchange call is introduced.
+4. Re-evaluate gate acceptance only after all required evidence and required human approval are present.

@@ -8,6 +8,8 @@ class LifecycleState(str, Enum):
     OPEN = "OPEN"
     PARTIAL = "PARTIAL"
     FILLED = "FILLED"
+    CANCEL_SENT = "CANCEL_SENT"
+    CANCEL_CONFIRMED = "CANCEL_CONFIRMED"
     CANCELED = "CANCELED"
     REJECTED = "REJECTED"
     UNKNOWN = "UNKNOWN"
@@ -17,8 +19,13 @@ _ALLOWED = {
     LifecycleState.NEW: {LifecycleState.SUBMITTED, LifecycleState.REJECTED},
     LifecycleState.SUBMITTED: {LifecycleState.ACKED, LifecycleState.UNKNOWN, LifecycleState.REJECTED},
     LifecycleState.ACKED: {LifecycleState.OPEN, LifecycleState.FILLED, LifecycleState.REJECTED},
-    LifecycleState.OPEN: {LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.CANCELED, LifecycleState.UNKNOWN},
-    LifecycleState.PARTIAL: {LifecycleState.FILLED, LifecycleState.CANCELED, LifecycleState.UNKNOWN},
+    LifecycleState.OPEN: {LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.CANCEL_SENT, LifecycleState.CANCELED, LifecycleState.UNKNOWN},
+    LifecycleState.PARTIAL: {LifecycleState.FILLED, LifecycleState.CANCEL_SENT, LifecycleState.CANCELED, LifecycleState.UNKNOWN},
+    # A fill observed while cancellation is in flight wins the race.
+    LifecycleState.CANCEL_SENT: {LifecycleState.CANCEL_CONFIRMED, LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
+    # Cancel acknowledgement is not proof that no fill event can arrive late.
+    # A delayed fill is authoritative execution evidence and must update state.
+    LifecycleState.CANCEL_CONFIRMED: {LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
 }
 
 
