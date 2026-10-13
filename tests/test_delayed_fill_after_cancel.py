@@ -141,3 +141,38 @@ async def test_t09_executor_stops_on_unknown_order_event_identity():
     )
     assert result.accepted is False
     assert result.code == "E_AGENT_STATE"
+
+
+@pytest.mark.asyncio
+async def test_t09_executor_stops_on_unknown_status_without_fill_regression():
+    from demo_exec.executor import DemoExecutor
+    from demo_exec.intent import Intent
+    from demo_exec.transport import NullTransport
+
+    executor = DemoExecutor(NullTransport())
+    result = await executor.submit(
+        Intent.create("agent1", "ETH/USDT:USDT", "buy", "unknown status", 103)
+    )
+    cl_id = result.client_order_id
+    assert executor.handle_order_event(
+        cl_id, OrderEvent("evt-ack-103", LifecycleState.ACKED, Decimal("0"))
+    )
+    assert executor.handle_order_event(
+        cl_id, OrderEvent("evt-open-103", LifecycleState.OPEN, Decimal("0"))
+    )
+    assert executor.handle_order_event(
+        cl_id, OrderEvent("evt-partial-103", LifecycleState.PARTIAL, Decimal("0.5"))
+    )
+
+    assert executor.handle_order_event(
+        cl_id, OrderEvent("evt-unknown-103", LifecycleState.UNKNOWN, Decimal("0.25"))
+    ) is True
+    processor = executor._order_events[cl_id]
+    assert processor.lifecycle.state is LifecycleState.UNKNOWN
+    assert processor.cumulative_filled == Decimal("0.5")
+
+    blocked = await executor.submit(
+        Intent.create("agent1", "ETH/USDT:USDT", "buy", "must stay stopped", 104)
+    )
+    assert blocked.accepted is False
+    assert blocked.code == "E_AGENT_STATE"
