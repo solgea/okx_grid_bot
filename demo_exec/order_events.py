@@ -1,8 +1,8 @@
-"""Offline order-event processor for the Phase-A execution contract.
+"""Deterministic order-event processing for the Phase-A shadow executor.
 
-This component has no exchange/network dependency and is not wired to a live
-transport. Production adapters must call it only after identity and schema
-validation; Phase A remains NullTransport-only.
+No exchange/network dependency is permitted here. Phase A remains
+NullTransport-only; real event-source wiring is a separately gated Phase-B
+change and must not be inferred from these offline contracts.
 """
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -44,21 +44,31 @@ class OrderEventProcessor:
             raise ValueError(f"{field_name} must be a finite decimal")
         return parsed
 
-    def process(self, event: OrderEvent) -> bool:
-        """Apply an event; return False for duplicate or stale notifications.
+    def mark_cancel_sent(self) -> None:
+        """Record local cancel intent; does not issue an exchange cancellation."""
+        if self.lifecycle.state not in {LifecycleState.OPEN, LifecycleState.PARTIAL}:
+            raise ValueError(f"cancel not allowed in state {self.lifecycle.state}")
+        self.lifecycle.transition(LifecycleState.CANCEL_SENT)
 
-        A lower cumulative fill is stale and ignored. It never rolls state or
-        quantity backward. A cancel confirmation is not proof of zero fills:
-        later larger cumulative fill notifications remain authoritative.
+    def process(self, event: OrderEvent) -> bool:
+        """Apply an event; False means duplicate or stale notification.
+
+        A cancel confirmation is not proof that no fill event can arrive late.
+        Lower cumulative quantities never roll back state or fill accounting.
+        Invalid events are not added to the deduplication set.
         """
         if not event.event_id or not event.event_id.strip():
             raise ValueError("event_id is required")
         if event.event_id in self._seen_event_ids:
             return False
         if event.state not in {
+            LifecycleState.ACKED,
+            LifecycleState.OPEN,
             LifecycleState.PARTIAL,
             LifecycleState.FILLED,
             LifecycleState.CANCEL_CONFIRMED,
+            LifecycleState.REJECTED,
+            LifecycleState.UNKNOWN,
         }:
             raise ValueError(f"unsupported order event state: {event.state}")
 
@@ -69,43 +79,47 @@ class OrderEventProcessor:
             raise ValueError("PARTIAL requires 0 < cumulative_filled < order_quantity")
         if event.state is LifecycleState.FILLED and filled != self.order_quantity:
             raise ValueError("FILLED requires cumulative_filled == order_quantity")
-
-        self._seen_event_ids.add(event.event_id)
-        if filled < self.cumulative_filled:
-            return False
-
+        if event.state in {LifecycleState.ACKED, LifecycleState.OPEN, LifecycleState.REJECTED} and filled != self.cumulative_filled:
+            raise ValueError(f"{event.state.value} cannot change cumulative fill")
         if event.state is LifecycleState.CANCEL_CONFIRMED:
             if filled != self.cumulative_filled:
                 raise ValueError("cancel confirmation cannot change cumulative fill")
-            if self.lifecycle.state is LifecycleState.CANCEL_SENT:
-                self.lifecycle.transition(LifecycleState.CANCEL_CONFIRMED)
-            elif self.lifecycle.state is not LifecycleState.CANCEL_CONFIRMED:
+            if self.lifecycle.state not in {LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED}:
                 raise ValueError("cancel confirmation received outside cancel flow")
-            return True
 
-        # A repeated PARTIAL state may update cumulative quantity without a
-        # lifecycle transition; FILLED remains the terminal execution state.
-        if self.lifecycle.state is LifecycleState.FILLED:
+        if filled < self.cumulative_filled and event.state is not LifecycleState.UNKNOWN:
+            self._seen_event_ids.add(event.event_id)
             return False
-        if event.state is LifecycleState.PARTIAL:
-            if self.lifecycle.state not in {
-                LifecycleState.OPEN,
-                LifecycleState.PARTIAL,
-                LifecycleState.CANCEL_SENT,
-                LifecycleState.CANCEL_CONFIRMED,
-            }:
-                raise ValueError(f"partial fill received in state {self.lifecycle.state}")
-        elif event.state is LifecycleState.FILLED:
-            if self.lifecycle.state not in {
-                LifecycleState.ACKED,
-                LifecycleState.OPEN,
-                LifecycleState.PARTIAL,
-                LifecycleState.CANCEL_SENT,
-                LifecycleState.CANCEL_CONFIRMED,
-            }:
-                raise ValueError(f"full fill received in state {self.lifecycle.state}")
+        if self.lifecycle.state is LifecycleState.FILLED:
+            self._seen_event_ids.add(event.event_id)
+            return False
 
-        self.cumulative_filled = filled
+        allowed = {
+            LifecycleState.ACKED: {LifecycleState.SUBMITTED},
+            LifecycleState.OPEN: {LifecycleState.ACKED},
+            LifecycleState.PARTIAL: {
+                LifecycleState.OPEN, LifecycleState.PARTIAL,
+                LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
+            },
+            LifecycleState.FILLED: {
+                LifecycleState.ACKED, LifecycleState.OPEN, LifecycleState.PARTIAL,
+                LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
+            },
+            LifecycleState.CANCEL_CONFIRMED: {
+                LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
+            },
+            LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED},
+            LifecycleState.UNKNOWN: {
+                LifecycleState.SUBMITTED, LifecycleState.ACKED, LifecycleState.OPEN,
+                LifecycleState.PARTIAL, LifecycleState.CANCEL_SENT,
+                LifecycleState.CANCEL_CONFIRMED,
+            },
+        }
+        if self.lifecycle.state is not event.state and self.lifecycle.state not in allowed[event.state]:
+            raise ValueError(f"event {event.state.value} invalid in state {self.lifecycle.state.value}")
+
+        self._seen_event_ids.add(event.event_id)
+        self.cumulative_filled = max(self.cumulative_filled, filled) if event.state is LifecycleState.UNKNOWN else filled
         if self.lifecycle.state is not event.state:
             self.lifecycle.transition(event.state)
         return True
