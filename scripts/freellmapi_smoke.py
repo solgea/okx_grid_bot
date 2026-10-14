@@ -52,7 +52,11 @@ def run_smoke(base_url: str, api_key: str, *, timeout: float = 25.0) -> bool:
             if response.status != 200:
                 print(f"FREELLMAPI_SMOKE=FAIL reason=http_{response.status}")
                 return False
-            payload = json.loads(response.read().decode("utf-8"))
+            raw_response = response.read(1_000_001)
+            if len(raw_response) > 1_000_000:
+                print("FREELLMAPI_SMOKE=FAIL reason=response_too_large")
+                return False
+            payload = json.loads(raw_response.decode("utf-8"))
         choices = payload.get("choices")
         content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
         if not isinstance(content, str) or not content.strip():
