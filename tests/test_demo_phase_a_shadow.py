@@ -180,6 +180,38 @@ def test_phase_a_evidence_consistency_accepts_valid_record():
 
 
 @pytest.mark.parametrize(
+    "field,wrong_value",
+    [
+        ("git_sha", "4fc3bb20d84759787bbf357e0e19ed1114cb879d"),
+        ("workflow_run_id", "38513143918"),
+        ("workflow_run_attempt", "2"),
+        ("workflow_event", "schedule"),
+    ],
+)
+def test_phase_a_provenance_must_match_actual_workflow(field, wrong_value):
+    evidence = valid_evidence()
+    expected = {
+        "git_sha": "c2b5423908ec96d72c0682cd88b1fc0949748daf",
+        "workflow_run_id": "38528140194",
+        "workflow_run_attempt": "1",
+        "workflow_event": "workflow_dispatch",
+    }
+    evidence[field] = wrong_value
+    assert validate_evidence_consistency(evidence, expected) is False
+
+
+def test_phase_a_provenance_accepts_exact_runtime_identity():
+    evidence = valid_evidence()
+    expected = {
+        "git_sha": "c2b5423908ec96d72c0682cd88b1fc0949748daf",
+        "workflow_run_id": "38528140194",
+        "workflow_run_attempt": "1",
+        "workflow_event": "workflow_dispatch",
+    }
+    assert validate_evidence_consistency(evidence, expected) is True
+
+
+@pytest.mark.parametrize(
     "override",
     [
         {"null_transport_place_calls": 2},
@@ -187,7 +219,6 @@ def test_phase_a_evidence_consistency_accepts_valid_record():
         {"workflow_run_id": "local"},
         {"workflow_event": "local"},
         {"workflow_run_attempt": "2"},
-        {"git_sha": "4fc3bb20d84759787bbf357e0e19ed1114cb879d"},
         {"evidence_id": "2026-10-14.json"},
         {"sequence_scope": "persistent"},
         {"sequence_continuity_proven": True},
