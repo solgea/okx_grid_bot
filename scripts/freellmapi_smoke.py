@@ -59,8 +59,8 @@ def run_smoke(base_url: str, api_key: str, *, timeout: float = 25.0) -> bool:
             payload = json.loads(raw_response.decode("utf-8"))
         choices = payload.get("choices")
         content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
-        if not isinstance(content, str) or not content.strip():
-            print("FREELLMAPI_SMOKE=FAIL reason=invalid_response_shape")
+        if content != "FREELLMAPI_SMOKE_OK":
+            print("FREELLMAPI_SMOKE=FAIL reason=unexpected_response")
             return False
         print("FREELLMAPI_SMOKE=PASS")
         return True
