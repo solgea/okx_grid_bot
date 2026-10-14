@@ -18,6 +18,10 @@ concurrency:
 
 jobs:
   smoke:
+    # Only run from the protected default branch; configure this environment with
+    # required reviewers and store the API key as an environment-scoped secret.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: freellmapi-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
