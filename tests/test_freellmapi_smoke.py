@@ -26,7 +26,7 @@ def test_smoke_logs_only_pass_fail(monkeypatch, capsys):
         status = 200
         def __enter__(self): return self
         def __exit__(self, *args): return False
-        def read(self):
+        def read(self, size=-1):
             return json.dumps({"choices": [{"message": {"content": "FREELLMAPI_SMOKE_OK"}}]}).encode()
 
     class Opener:
