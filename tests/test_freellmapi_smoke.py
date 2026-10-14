@@ -53,3 +53,20 @@ def test_http_error_body_is_never_logged(monkeypatch, capsys):
     assert output.strip() == "FREELLMAPI_SMOKE=FAIL reason=http_429"
     assert "private provider detail" not in output
     assert "secret-test-key" not in output
+
+
+def test_unexpected_model_content_fails_smoke(monkeypatch, capsys):
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, size=-1):
+            return json.dumps({"choices": [{"message": {"content": "some other answer"}}]}).encode()
+
+    class Opener:
+        def open(self, request, timeout):
+            return Response()
+
+    monkeypatch.setattr("scripts.freellmapi_smoke.urllib.request.build_opener", lambda *args: Opener())
+    assert run_smoke("https://llm.example.test", "secret-test-key") is False
+    assert capsys.readouterr().out.strip() == "FREELLMAPI_SMOKE=FAIL reason=unexpected_response"
