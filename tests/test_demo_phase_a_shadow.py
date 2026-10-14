@@ -10,6 +10,7 @@ from demo_exec.transport import NullTransport
 from scripts.record_phase_a_evidence import (
     acceptance_passes,
     phase_a_agent_id,
+    phase_a_evidence_filename,
     validate_evidence_consistency,
 )
 
@@ -144,13 +145,25 @@ def test_clordid_normalizes_long_agent_ids():
 
 
 def valid_evidence():
+    day = "2026-10-14"
+    run_id = "38528140194"
+    attempt = "1"
     return {
+        "schema": "phase-a-evidence.v3",
+        "evidence_id": phase_a_evidence_filename(day, run_id, attempt),
+        "date_utc": day,
+        "git_sha": "c2b5423908ec96d72c0682cd88b1fc0949748daf",
+        "workflow_run_id": run_id,
+        "workflow_run_attempt": attempt,
+        "workflow_event": "workflow_dispatch",
         "transport": "NullTransport",
+        "exchange_touched": False,
+        "exchange_mutation_calls": 0,
+        "exchange_order_call_observation": {"value": 0},
         "intent_count": 3,
         "null_transport_place_calls": 3,
         "journal_event_count": 3,
-        "workflow_run_id": "12345",
-        "workflow_event": "workflow_dispatch",
+        "incidents": [],
         "sequence_scope": "daily_synthetic_validation",
         "sequence_continuity_proven": False,
         "acceptance": {
@@ -173,9 +186,16 @@ def test_phase_a_evidence_consistency_accepts_valid_record():
         {"journal_event_count": 2},
         {"workflow_run_id": "local"},
         {"workflow_event": "local"},
+        {"workflow_run_attempt": "2"},
+        {"git_sha": "4fc3bb20d84759787bbf357e0e19ed1114cb879d"},
+        {"evidence_id": "2026-10-14.json"},
         {"sequence_scope": "persistent"},
         {"sequence_continuity_proven": True},
         {"transport": "OkxDemoTransport"},
+        {"exchange_mutation_calls": 1},
+        {"exchange_order_call_observation": {"value": 1}},
+        {"incidents": [{"code": "unexpected"}]},
+        {"schema": "phase-a-evidence.v2"},
     ],
 )
 def test_phase_a_evidence_consistency_rejects_mismatch_or_weak_provenance(override):
@@ -187,6 +207,7 @@ def test_phase_a_evidence_consistency_rejects_mismatch_or_weak_provenance(overri
 def test_phase_a_evidence_consistency_accepts_coherent_local_record():
     evidence = valid_evidence()
     evidence.update({
+        "evidence_id": phase_a_evidence_filename("2026-10-14", "local", "local"),
         "workflow_run_id": "local",
         "workflow_run_attempt": "local",
         "workflow_event": "local",
@@ -195,12 +216,20 @@ def test_phase_a_evidence_consistency_accepts_coherent_local_record():
     assert validate_evidence_consistency(evidence) is True
 
 
-def test_phase_a_agent_ids_are_date_scoped_and_synthetic():
-    first = phase_a_agent_id("2026-10-12")
-    next_day = phase_a_agent_id("2026-10-13")
-    assert first == "phasea20261012"
+def test_phase_a_evidence_filename_is_unique_per_run_and_attempt():
+    first = phase_a_evidence_filename("2026-10-14", "12345", "1")
+    second_run = phase_a_evidence_filename("2026-10-14", "12346", "1")
+    retry = phase_a_evidence_filename("2026-10-14", "12345", "2")
+    assert first == "2026-10-14-run-12345-attempt-1.json"
+    assert len({first, second_run, retry}) == 3
+
+
+def test_phase_a_agent_ids_are_run_scoped_and_synthetic():
+    first = phase_a_agent_id("2026-10-14", "12345")
+    retry = phase_a_agent_id("2026-10-14", "12346")
+    assert first == "phasea2026101412345"
     assert first.isalnum()
-    assert first != next_day
+    assert first != retry
     first_result = asyncio.run(DemoExecutor(NullTransport()).submit(intent(1, first)))
-    next_result = asyncio.run(DemoExecutor(NullTransport()).submit(intent(1, next_day)))
+    next_result = asyncio.run(DemoExecutor(NullTransport()).submit(intent(1, retry)))
     assert first_result.client_order_id != next_result.client_order_id
