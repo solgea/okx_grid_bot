@@ -28,20 +28,27 @@ jobs:
           python - <<'PY'
           import json
           import os
-          from pathlib import Path
           from datetime import datetime, timezone
+          from pathlib import Path
 
-          p = Path("artifacts/phase_a") / f"{datetime.now(timezone.utc).date().isoformat()}.json"
-          d = json.loads(p.read_text())
-          assert d["schema"] == "phase-a-evidence.v2"
+          day = datetime.now(timezone.utc).date().isoformat()
+          run_id = os.environ["GITHUB_RUN_ID"]
+          attempt = os.environ["GITHUB_RUN_ATTEMPT"]
+          evidence_id = f"{day}-run-{run_id}-attempt-{attempt}.json"
+          p = Path("artifacts/phase_a") / evidence_id
+          d = json.loads(p.read_text(encoding="utf-8"))
+
+          assert d["schema"] == "phase-a-evidence.v3"
+          assert d["evidence_id"] == evidence_id
+          assert d["date_utc"] == day
           assert d["phase"] == "A"
           assert d["transport"] == "NullTransport"
           assert d["exchange_touched"] is False
           assert d["exchange_mutation_calls"] == 0
           assert d["exchange_order_call_observation"]["value"] == 0
           assert d["exchange_order_call_observation"]["basis"] == "structural"
-          assert d["workflow_run_id"] == os.environ["GITHUB_RUN_ID"]
-          assert d["workflow_run_attempt"] == os.environ["GITHUB_RUN_ATTEMPT"]
+          assert d["workflow_run_id"] == run_id
+          assert d["workflow_run_attempt"] == attempt
           assert d["workflow_event"] == os.environ["GITHUB_EVENT_NAME"]
           assert d["workflow_event"] in ("schedule", "workflow_dispatch")
           assert d["git_sha"] == os.environ["GITHUB_SHA"]
@@ -55,8 +62,9 @@ jobs:
           assert d["acceptance"]["unresolved_incidents"] == 0
           assert d["incidents"] == []
           print("PHASE_A_EVIDENCE=PASS")
+          print(f"PHASE_A_EVIDENCE_PATH={p}")
           PY
-      - name: Commit daily evidence
+      - name: Commit run-scoped evidence
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -65,5 +73,5 @@ jobs:
             echo "No new evidence to commit."
             exit 0
           fi
-          git commit -m "chore: record Phase A shadow evidence"
+          git commit -m "chore: record Phase A run-scoped shadow evidence"
           git push
