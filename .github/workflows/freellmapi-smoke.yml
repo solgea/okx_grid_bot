@@ -1,0 +1,44 @@
+name: FreeLLMAPI Connectivity Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_api_smoke:
+        description: "Send one fixed, tool-free prompt to the configured FreeLLMAPI endpoint"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freellmapi-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify probe unit tests
+        run: python -m pytest -q tests/test_freellmapi_smoke.py tests/test_continuation_state.py
+
+      - name: Skip remote request unless explicitly enabled
+        if: ${{ inputs.run_api_smoke == false }}
+        run: echo "FREELLMAPI_SMOKE=SKIPPED_BY_INPUT"
+
+      - name: Run fixed-prompt API smoke test
+        if: ${{ inputs.run_api_smoke == true }}
+        env:
+          FREELLMAPI_BASE_URL: ${{ vars.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+        run: python scripts/freellmapi_smoke.py
