@@ -43,8 +43,11 @@ def phase_a_evidence_filename(day: str, run_id: str, attempt: str) -> str:
     return f"{day}-run-{safe_run_id}-attempt-{safe_attempt}.json"
 
 
-def validate_evidence_consistency(evidence: dict[str, Any]) -> bool:
-    """Reject evidence whose reported counts, run identity, or provenance disagree."""
+def validate_evidence_consistency(
+    evidence: dict[str, Any],
+    expected_provenance: dict[str, str] | None = None,
+) -> bool:
+    """Reject inconsistent counts and, when supplied, mismatched runtime provenance."""
     event = evidence.get("workflow_event")
     run_id = evidence.get("workflow_run_id")
     attempt = evidence.get("workflow_run_attempt")
@@ -71,6 +74,12 @@ def validate_evidence_consistency(evidence: dict[str, Any]) -> bool:
     else:
         provenance_valid = False
 
+    if expected_provenance is not None:
+        provenance_valid = provenance_valid and all(
+            evidence.get(field) == expected_provenance.get(field)
+            for field in ("git_sha", "workflow_run_id", "workflow_run_attempt", "workflow_event")
+        )
+
     return (
         evidence.get("schema") == "phase-a-evidence.v3"
         and evidence.get("transport") == "NullTransport"
@@ -95,6 +104,12 @@ async def run_shadow() -> dict:
     attempt = os.getenv("GITHUB_RUN_ATTEMPT", "local")
     event = os.getenv("GITHUB_EVENT_NAME", "local")
     git_sha = os.getenv("GITHUB_SHA", "local")
+    expected_provenance = {
+        "git_sha": git_sha,
+        "workflow_run_id": run_id,
+        "workflow_run_attempt": attempt,
+        "workflow_event": event,
+    }
     evidence_id = phase_a_evidence_filename(day, run_id, attempt)
     EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     path = EVIDENCE_DIR / evidence_id
@@ -129,10 +144,7 @@ async def run_shadow() -> dict:
             "evidence_id": evidence_id,
             "date_utc": day,
             "recorded_at_utc": now.isoformat(),
-            "git_sha": git_sha,
-            "workflow_run_id": run_id,
-            "workflow_run_attempt": attempt,
-            "workflow_event": event,
+            **expected_provenance,
             "phase": "A",
             "symbol": SYMBOL,
             "transport": type(transport).__name__,
@@ -164,7 +176,7 @@ async def run_shadow() -> dict:
             },
         }
 
-        if not validate_evidence_consistency(evidence):
+        if not validate_evidence_consistency(evidence, expected_provenance):
             raise RuntimeError("E_PHASE_A_DAILY_GATE")
 
         # Exclusive creation protects immutable evidence from accidental overwrite.
