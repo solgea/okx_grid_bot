@@ -1,0 +1,57 @@
+{
+  "acceptance": {
+    "daily_shadow_run": true,
+    "null_transport_only": true,
+    "unexpected_exchange_order_calls": 0,
+    "unresolved_incidents": 0
+  },
+  "agent_id": "phasea2026101538681719058",
+  "counts_consistent": true,
+  "date_utc": "2026-10-15",
+  "evidence_id": "2026-10-15-run-38681719058-attempt-1.json",
+  "exchange_mutation_calls": 0,
+  "exchange_order_call_observation": {
+    "basis": "structural",
+    "details": "DemoExecutor accepts only NullTransport in Phase A; NullTransport has no exchange client. This is a structural guarantee, not external network telemetry.",
+    "value": 0
+  },
+  "exchange_touched": false,
+  "git_sha": "78be59a2d642debe81b9eee43fea50a6b5e93b57",
+  "incidents": [],
+  "intent_count": 3,
+  "journal_event_count": 3,
+  "null_transport_place_calls": 3,
+  "phase": "A",
+  "recorded_at_utc": "2026-10-15T04:29:45.367237+00:00",
+  "results": [
+    {
+      "accepted": true,
+      "client_order_id": "gphasea20261015386817190581",
+      "code": "SHADOW",
+      "seq": 1,
+      "state": "SUBMITTED"
+    },
+    {
+      "accepted": true,
+      "client_order_id": "gphasea20261015386817190582",
+      "code": "SHADOW",
+      "seq": 2,
+      "state": "SUBMITTED"
+    },
+    {
+      "accepted": true,
+      "client_order_id": "gphasea20261015386817190583",
+      "code": "SHADOW",
+      "seq": 3,
+      "state": "SUBMITTED"
+    }
+  ],
+  "schema": "phase-a-evidence.v3",
+  "sequence_continuity_proven": false,
+  "sequence_scope": "daily_synthetic_validation",
+  "symbol": "ETH/USDT:USDT",
+  "transport": "NullTransport",
+  "workflow_event": "schedule",
+  "workflow_run_attempt": "1",
+  "workflow_run_id": "38681719058"
+}
