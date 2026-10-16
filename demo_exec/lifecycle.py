@@ -26,6 +26,9 @@ _ALLOWED = {
     # Cancel acknowledgement is not proof that no fill event can arrive late.
     # A delayed fill is authoritative execution evidence and must update state.
     LifecycleState.CANCEL_CONFIRMED: {LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
+    # UNKNOWN blocks new submissions but may be resolved by authoritative order
+    # events correlated to the already-known client order ID.
+    LifecycleState.UNKNOWN: {LifecycleState.ACKED, LifecycleState.OPEN, LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.REJECTED},
 }
 
 

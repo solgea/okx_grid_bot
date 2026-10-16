@@ -64,6 +64,15 @@ class DemoExecutor:
             result = await self.transport.place(intent)
         except (TimeoutError, ConnectionError):
             self._stopped = True
+            # Preserve a correlation target for authoritative late events. The
+            # executor remains stopped for new submissions, but a known order ID
+            # may still resolve UNKNOWN to actual exchange-reported state.
+            lifecycle = Lifecycle()
+            lifecycle.transition(LifecycleState.SUBMITTED)
+            lifecycle.transition(LifecycleState.UNKNOWN)
+            self._order_events[cl_id] = OrderEventProcessor(
+                order_quantity=Decimal("1"), lifecycle=lifecycle
+            )
             if self.journal:
                 try:
                     self.journal.append({"event": "UNKNOWN", "agent_id": intent.agent_id, "seq": intent.seq})
@@ -107,10 +116,10 @@ class DemoExecutor:
         """Route a validated event through the executor's tracked shadow order.
 
         This is an offline event-ingress seam only. No exchange watcher or
-        Phase-B transport is enabled by this method.
+        Phase-B transport is enabled by this method. Known order events remain
+        admissible after the executor stops new submissions, so late fill
+        evidence is not discarded.
         """
-        if self._stopped:
-            raise RuntimeError("E_AGENT_STATE: executor is stopped")
         processor = self._order_events.get(client_order_id)
         if processor is None:
             self._stop_for_unknown_order(client_order_id)

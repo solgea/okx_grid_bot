@@ -22,7 +22,7 @@ class TimeoutNullTransport(NullTransport):
 
 
 @pytest.mark.asyncio
-async def test_late_filled_event_after_submit_timeout_fails_closed(tmp_path):
+async def test_late_fill_after_submit_timeout_is_recorded_but_new_submits_fail_closed(tmp_path):
     journal_path = tmp_path / "events.jsonl"
     journal = Journal(journal_path)
     transport = TimeoutNullTransport()
@@ -37,18 +37,17 @@ async def test_late_filled_event_after_submit_timeout_fails_closed(tmp_path):
     assert result.client_order_id
     assert transport.place_calls == 1
 
-    # A late fill cannot be attached to an order whose submit outcome is UNKNOWN.
-    with pytest.raises(RuntimeError, match="E_AGENT_STATE"):
-        executor.handle_order_event(
-            result.client_order_id,
-            OrderEvent(
-                event_id="late-filled-1",
-                state=LifecycleState.FILLED,
-                cumulative_filled=Decimal("1"),
-            ),
-        )
+    # An authoritative late fill resolves order reality even while the executor
+    # remains stopped for new submissions.
+    fill = OrderEvent(
+        event_id="late-filled-1",
+        state=LifecycleState.FILLED,
+        cumulative_filled=Decimal("1"),
+    )
+    assert executor.handle_order_event(result.client_order_id, fill) is True
+    assert executor.handle_order_event(result.client_order_id, fill) is False
 
-    # The ambiguous intent is never retried, and unrelated intents are also blocked.
+    # The ambiguous intent is never retried, and unrelated intents remain blocked.
     same_intent_retry = await executor.submit(intent)
     assert same_intent_retry.accepted is False
     assert same_intent_retry.code == "E_JOURNAL"
@@ -62,5 +61,6 @@ async def test_late_filled_event_after_submit_timeout_fails_closed(tmp_path):
     assert transport.place_calls == 1
 
     rows = [json.loads(line) for line in journal_path.read_text(encoding="utf-8").splitlines()]
-    assert [row["event"] for row in rows] == ["INTENT", "UNKNOWN"]
-    assert all(row["event"] != "ORDER_EVENT" for row in rows)
+    assert [row["event"] for row in rows] == ["INTENT", "UNKNOWN", "ORDER_EVENT"]
+    assert rows[-1]["state"] == LifecycleState.FILLED.value
+    assert rows[-1]["cumulative_filled"] == "1"

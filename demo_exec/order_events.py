@@ -95,24 +95,26 @@ class OrderEventProcessor:
             return False
 
         allowed = {
-            LifecycleState.ACKED: {LifecycleState.SUBMITTED},
-            LifecycleState.OPEN: {LifecycleState.ACKED},
+            LifecycleState.ACKED: {LifecycleState.SUBMITTED, LifecycleState.UNKNOWN},
+            LifecycleState.OPEN: {LifecycleState.ACKED, LifecycleState.UNKNOWN},
             LifecycleState.PARTIAL: {
                 LifecycleState.OPEN, LifecycleState.PARTIAL,
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
+                LifecycleState.UNKNOWN,
             },
             LifecycleState.FILLED: {
                 LifecycleState.ACKED, LifecycleState.OPEN, LifecycleState.PARTIAL,
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
+                LifecycleState.UNKNOWN,
             },
             LifecycleState.CANCEL_CONFIRMED: {
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
             },
-            LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED},
+            LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED, LifecycleState.UNKNOWN},
             LifecycleState.UNKNOWN: {
                 LifecycleState.SUBMITTED, LifecycleState.ACKED, LifecycleState.OPEN,
                 LifecycleState.PARTIAL, LifecycleState.CANCEL_SENT,
-                LifecycleState.CANCEL_CONFIRMED,
+                LifecycleState.CANCEL_CONFIRMED, LifecycleState.UNKNOWN,
             },
         }
         if self.lifecycle.state is not event.state and self.lifecycle.state not in allowed[event.state]:
