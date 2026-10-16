@@ -98,7 +98,7 @@ class DemoExecutor:
         # Phase A NullTransport has a fixed one-unit shadow contract. This is
         # not an exchange order quantity and cannot be reused for Phase B.
         self._order_events[cl_id] = OrderEventProcessor(
-            order_quantity=Decimal("1"), lifecycle=lifecycle
+            order_quantity=SHADOW_ORDER_QUANTITY, lifecycle=lifecycle
         )
         return SubmitResult(True, "SHADOW", LifecycleState.SUBMITTED.value, cl_id)
 
