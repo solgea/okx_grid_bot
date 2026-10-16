@@ -95,33 +95,36 @@ class OrderEventProcessor:
             return False
 
         allowed = {
-            LifecycleState.ACKED: {LifecycleState.SUBMITTED, LifecycleState.UNKNOWN},
-            LifecycleState.OPEN: {LifecycleState.ACKED, LifecycleState.UNKNOWN},
+            LifecycleState.ACKED: {LifecycleState.SUBMITTED},
+            LifecycleState.OPEN: {LifecycleState.ACKED},
             LifecycleState.PARTIAL: {
                 LifecycleState.OPEN, LifecycleState.PARTIAL,
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
-                LifecycleState.UNKNOWN,
             },
             LifecycleState.FILLED: {
                 LifecycleState.ACKED, LifecycleState.OPEN, LifecycleState.PARTIAL,
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
-                LifecycleState.UNKNOWN,
             },
             LifecycleState.CANCEL_CONFIRMED: {
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
             },
-            LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED, LifecycleState.UNKNOWN},
-            LifecycleState.UNKNOWN: {
-                LifecycleState.SUBMITTED, LifecycleState.ACKED, LifecycleState.OPEN,
-                LifecycleState.PARTIAL, LifecycleState.CANCEL_SENT,
-                LifecycleState.CANCEL_CONFIRMED, LifecycleState.UNKNOWN,
-            },
+            LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED},
+            LifecycleState.UNKNOWN: {LifecycleState.SUBMITTED},
         }
-        if self.lifecycle.state is not event.state and self.lifecycle.state not in allowed[event.state]:
-            raise ValueError(f"event {event.state.value} invalid in state {self.lifecycle.state.value}")
+        current = self.lifecycle.state
+        if current is LifecycleState.UNKNOWN:
+            if event.state is LifecycleState.UNKNOWN:
+                self._seen_event_ids.add(event.event_id)
+                self.cumulative_filled = max(self.cumulative_filled, filled)
+                return False
+            # Explicit resolution is restricted to authoritative order states;
+            # cancellation confirmation alone cannot resolve ambiguous submit.
+            self.lifecycle.resolve_unknown(event.state)
+        elif current is not event.state and current not in allowed[event.state]:
+            raise ValueError(f"event {event.state.value} invalid in state {current.value}")
 
         self._seen_event_ids.add(event.event_id)
         self.cumulative_filled = max(self.cumulative_filled, filled) if event.state is LifecycleState.UNKNOWN else filled
-        if self.lifecycle.state is not event.state:
+        if current is not LifecycleState.UNKNOWN and self.lifecycle.state is not event.state:
             self.lifecycle.transition(event.state)
         return True
