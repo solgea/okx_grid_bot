@@ -36,6 +36,8 @@ async def test_late_filled_event_after_submit_timeout_fails_closed(tmp_path):
     assert result.state == LifecycleState.UNKNOWN.value
     assert result.client_order_id
     assert transport.place_calls == 1
+    # UNKNOWN submit results do not create a processor that could accept late fills.
+    assert result.client_order_id not in executor._order_events
 
     # A late fill cannot be attached to an order whose submit outcome is UNKNOWN.
     with pytest.raises(RuntimeError, match="E_AGENT_STATE"):
