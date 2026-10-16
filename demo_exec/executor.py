@@ -9,6 +9,11 @@ from .order_events import OrderEvent, OrderEventProcessor
 from .transport import NullTransport, Transport
 
 
+# Phase A is a fixed-size shadow contract only. This is not an exchange order size.
+# Phase B must source quantity from its validated order intent, never this constant.
+SHADOW_ORDER_QUANTITY = Decimal("1")
+
+
 @dataclass(frozen=True)
 class SubmitResult:
     accepted: bool
@@ -71,7 +76,7 @@ class DemoExecutor:
             lifecycle.transition(LifecycleState.SUBMITTED)
             lifecycle.transition(LifecycleState.UNKNOWN)
             self._order_events[cl_id] = OrderEventProcessor(
-                order_quantity=Decimal("1"), lifecycle=lifecycle
+                order_quantity=SHADOW_ORDER_QUANTITY, lifecycle=lifecycle
             )
             if self.journal:
                 try:
@@ -90,7 +95,7 @@ class DemoExecutor:
 
         lifecycle = Lifecycle()
         lifecycle.transition(LifecycleState.SUBMITTED)
-        # NullTransport's deterministic shadow contract uses amount=1. This is
+        # Phase A NullTransport has a fixed one-unit shadow contract. This is
         # not an exchange order quantity and cannot be reused for Phase B.
         self._order_events[cl_id] = OrderEventProcessor(
             order_quantity=Decimal("1"), lifecycle=lifecycle
