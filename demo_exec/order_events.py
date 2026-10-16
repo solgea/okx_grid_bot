@@ -109,7 +109,12 @@ class OrderEventProcessor:
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
             },
             LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED},
-            LifecycleState.UNKNOWN: {LifecycleState.SUBMITTED},
+            # Unknown status may be reported after an accepted/open/partial order.
+            # This is an order-event path, not an ordinary lifecycle transition.
+            LifecycleState.UNKNOWN: {
+                LifecycleState.SUBMITTED, LifecycleState.OPEN, LifecycleState.PARTIAL,
+                LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
+            },
         }
         current = self.lifecycle.state
         if current is LifecycleState.UNKNOWN:
