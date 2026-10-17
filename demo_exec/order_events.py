@@ -79,6 +79,12 @@ class OrderEventProcessor:
             raise ValueError("PARTIAL requires 0 < cumulative_filled < order_quantity")
         if event.state is LifecycleState.FILLED and filled != self.order_quantity:
             raise ValueError("FILLED requires cumulative_filled == order_quantity")
+        # Stale non-UNKNOWN notifications cannot regress fill accounting or
+        # resolve an UNKNOWN lifecycle. Mark them seen so replay is idempotent.
+        if filled < self.cumulative_filled and event.state is not LifecycleState.UNKNOWN:
+            self._seen_event_ids.add(event.event_id)
+            return False
+
         if event.state in {LifecycleState.ACKED, LifecycleState.OPEN, LifecycleState.REJECTED} and filled != self.cumulative_filled:
             raise ValueError(f"{event.state.value} cannot change cumulative fill")
         if event.state is LifecycleState.CANCEL_CONFIRMED:
@@ -87,9 +93,6 @@ class OrderEventProcessor:
             if self.lifecycle.state not in {LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED}:
                 raise ValueError("cancel confirmation received outside cancel flow")
 
-        if filled < self.cumulative_filled and event.state is not LifecycleState.UNKNOWN:
-            self._seen_event_ids.add(event.event_id)
-            return False
         if self.lifecycle.state is LifecycleState.FILLED:
             self._seen_event_ids.add(event.event_id)
             return False
@@ -109,17 +112,29 @@ class OrderEventProcessor:
                 LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
             },
             LifecycleState.REJECTED: {LifecycleState.SUBMITTED, LifecycleState.ACKED},
+            # Unknown status may be reported after an accepted/open/partial order.
+            # This is an order-event path, not an ordinary lifecycle transition.
             LifecycleState.UNKNOWN: {
-                LifecycleState.SUBMITTED, LifecycleState.ACKED, LifecycleState.OPEN,
-                LifecycleState.PARTIAL, LifecycleState.CANCEL_SENT,
-                LifecycleState.CANCEL_CONFIRMED,
+                LifecycleState.SUBMITTED, LifecycleState.OPEN, LifecycleState.PARTIAL,
+                LifecycleState.CANCEL_SENT, LifecycleState.CANCEL_CONFIRMED,
             },
         }
-        if self.lifecycle.state is not event.state and self.lifecycle.state not in allowed[event.state]:
-            raise ValueError(f"event {event.state.value} invalid in state {self.lifecycle.state.value}")
+        current = self.lifecycle.state
+        if current is LifecycleState.UNKNOWN:
+            if event.state is LifecycleState.UNKNOWN:
+                self._seen_event_ids.add(event.event_id)
+                if filled > self.cumulative_filled:
+                    self.cumulative_filled = filled
+                    return True
+                return False
+            # Explicit resolution is restricted to authoritative order states;
+            # cancellation confirmation alone cannot resolve ambiguous submit.
+            self.lifecycle.resolve_unknown(event.state)
+        elif current is not event.state and current not in allowed[event.state]:
+            raise ValueError(f"event {event.state.value} invalid in state {current.value}")
 
         self._seen_event_ids.add(event.event_id)
         self.cumulative_filled = max(self.cumulative_filled, filled) if event.state is LifecycleState.UNKNOWN else filled
-        if self.lifecycle.state is not event.state:
+        if current is not LifecycleState.UNKNOWN and self.lifecycle.state is not event.state:
             self.lifecycle.transition(event.state)
         return True
