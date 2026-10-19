@@ -16,9 +16,13 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
+from config.settings import config, to_native_symbol
+
 logger = logging.getLogger("PaperTrading")
 
-INSTRUMENT_ID = "ETH-USDT-SWAP"
+# Paper-book contract size. This is the simulated size of one contract of the
+# configured symbol; it mirrors the OKX ctVal convention (0.01 for the
+# default ETH-USDT-SWAP). The instrument itself follows config.SYMBOL.
 CONTRACT_SIZE = 0.01
 MAX_CONTRACTS = 100
 MAX_LEVERAGE = 5
@@ -76,7 +80,7 @@ class PaperTradingManager:
 
     @staticmethod
     def fetch_public_price() -> float:
-        query = urllib.parse.urlencode({"instId": INSTRUMENT_ID})
+        query = urllib.parse.urlencode({"instId": to_native_symbol(config.SYMBOL)})
         request = urllib.request.Request(
             f"https://www.okx.com/api/v5/market/ticker?{query}",
             headers={"User-Agent": "OKX-Grid-Bot-Paper/1.0"},
@@ -253,7 +257,7 @@ class PaperTradingManager:
             return {
                 "mode": "paper",
                 "exchange": "OKX public market data",
-                "instrument": INSTRUMENT_ID,
+                "instrument": to_native_symbol(config.SYMBOL),
                 "contract_size": CONTRACT_SIZE,
                 "price": self._market_price,
                 "price_age_seconds": round(age, 1) if age is not None else None,

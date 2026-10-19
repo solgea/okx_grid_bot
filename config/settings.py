@@ -1,8 +1,23 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-NATIVE_SYMBOL = "ETH-USDT-SWAP"
-CCXT_SYMBOL = "ETH/USDT:USDT"
+DEFAULT_SYMBOL = "ETH/USDT:USDT"
 BAR_TIMEFRAME = "15m"
+
+
+def to_native_symbol(ccxt_symbol: str) -> str:
+    """Convert a CCXT unified symbol into the native OKX instrument id.
+
+    "ETH/USDT:USDT" -> "ETH-USDT-SWAP". Fails closed on any symbol that is
+    not a unified BASE/QUOTE:SETTLE contract.
+    """
+    base, separator, remainder = ccxt_symbol.partition("/")
+    quote = remainder.partition(":")[0]
+    if not separator or not base or not quote:
+        raise ValueError(
+            f"SYMBOL must look like 'BASE/QUOTE:SETTLE' (got {ccxt_symbol!r})"
+        )
+    return f"{base}-{quote}-SWAP"
 
 
 class Settings(BaseSettings):
@@ -20,7 +35,7 @@ class Settings(BaseSettings):
     EMERGENCY_FLATTEN_ENABLED: bool = False
     EMERGENCY_FLATTEN_AUTHORIZED: bool = False
 
-    SYMBOL: str = CCXT_SYMBOL
+    SYMBOL: str = DEFAULT_SYMBOL
     LEVERAGE: int = 10
     MARGIN_MODE: str = "cross"
     TIMEFRAME: str = BAR_TIMEFRAME
@@ -49,5 +64,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("SYMBOL")
+    @classmethod
+    def _validate_symbol(cls, value: str) -> str:
+        """Reject symbols that cannot be mapped to a native OKX instrument."""
+        to_native_symbol(value)
+        return value
+
 
 config = Settings()
+
+# Convenience aliases derived from the effective configuration. These follow
+# SYMBOL instead of pinning a hardcoded instrument.
+CCXT_SYMBOL = config.SYMBOL
+NATIVE_SYMBOL = to_native_symbol(config.SYMBOL)

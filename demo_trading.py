@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 import ccxt
 
-from config.settings import CCXT_SYMBOL, NATIVE_SYMBOL, config
+from config.settings import config, to_native_symbol
 
 logger = logging.getLogger("OKXDemoTrading")
 
@@ -32,6 +32,16 @@ class DemoTradingManager:
         self._last_state: dict[str, Any] | None = None
         self._last_state_at = 0.0
         self._last_error: str | None = None
+
+    @property
+    def symbol(self) -> str:
+        """The configured unified symbol; the Demo panel follows SYMBOL."""
+        return config.SYMBOL
+
+    @property
+    def native_symbol(self) -> str:
+        """The native OKX instrument id for the configured symbol."""
+        return to_native_symbol(config.SYMBOL)
 
     @property
     def configured(self) -> bool:
@@ -63,28 +73,29 @@ class DemoTradingManager:
                 return self._last_state
             try:
                 exchange = self._get_exchange()
+                symbol = self.symbol
                 balance_response = exchange.fetch_balance()
-                positions_response = exchange.fetch_positions([CCXT_SYMBOL])
-                orders_response = exchange.fetch_open_orders(CCXT_SYMBOL)
+                positions_response = exchange.fetch_positions([symbol])
+                orders_response = exchange.fetch_open_orders(symbol)
                 balance = balance_response.get("USDT", {})
                 positions = [
                     self._public_position(position)
                     for position in positions_response
-                    if position.get("symbol") == CCXT_SYMBOL
+                    if position.get("symbol") == symbol
                     and float(position.get("contracts") or 0) != 0
                 ]
                 orders = [
                     self._public_order(order)
                     for order in orders_response
-                    if order.get("symbol") == CCXT_SYMBOL
+                    if order.get("symbol") == symbol
                 ]
                 state = {
                     "mode": "demo",
                     "configured": True,
                     "connected": True,
                     "account": "OKX Demo",
-                    "symbol": CCXT_SYMBOL,
-                    "instrument": NATIVE_SYMBOL,
+                    "symbol": symbol,
+                    "instrument": self.native_symbol,
                     "balance": self._number(balance.get("free")),
                     "total_balance": self._number(balance.get("total")),
                     "positions": positions,
@@ -151,20 +162,21 @@ class DemoTradingManager:
                 )
             try:
                 exchange = self._get_exchange()
-                market = exchange.market(CCXT_SYMBOL)
-                amount = float(exchange.amount_to_precision(CCXT_SYMBOL, contracts))
+                symbol = self.symbol
+                market = exchange.market(symbol)
+                amount = float(exchange.amount_to_precision(symbol, contracts))
                 minimum = market.get("limits", {}).get("amount", {}).get("min")
                 if amount <= 0 or (minimum is not None and amount < float(minimum)):
                     raise DemoTradingError(
                         "Kontrat miktarı OKX en düşük işlem limitinin altında."
                     )
                 formatted_price = (
-                    float(exchange.price_to_precision(CCXT_SYMBOL, price))
+                    float(exchange.price_to_precision(symbol, price))
                     if order_type == "limit" and price is not None
                     else None
                 )
                 exchange_order = exchange.create_order(
-                    CCXT_SYMBOL,
+                    symbol,
                     order_type,
                     side,
                     amount,
@@ -176,8 +188,8 @@ class DemoTradingManager:
                 return {
                     "mode": "demo",
                     "id": str(exchange_order.get("id", "")),
-                    "symbol": CCXT_SYMBOL,
-                    "instrument": NATIVE_SYMBOL,
+                    "symbol": symbol,
+                    "instrument": self.native_symbol,
                     "type": order_type,
                     "side": side,
                     "amount": self._number(exchange_order.get("amount") or amount),
@@ -256,8 +268,8 @@ class DemoTradingManager:
             "configured": self.configured,
             "connected": False,
             "account": "OKX Demo",
-            "symbol": CCXT_SYMBOL,
-            "instrument": NATIVE_SYMBOL,
+            "symbol": self.symbol,
+            "instrument": self.native_symbol,
             "balance": None,
             "total_balance": None,
             "positions": [],

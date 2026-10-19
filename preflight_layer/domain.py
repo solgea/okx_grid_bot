@@ -33,6 +33,10 @@ class OrderIntent:
     position_side: str = "net"
     reduce_only: bool = False
     client_order_id: str = ""
+    # Risk-relevant execution context. These are part of the authorization
+    # fingerprint so a token cannot be replayed against different targets.
+    expected_target_price: Optional[Decimal] = None
+    is_maker: bool = True
 
 @dataclass
 class InstrumentMetadata:
@@ -101,6 +105,8 @@ def _intent_fingerprint(intents) -> str:
                     str(intent.position_side),
                     str(intent.reduce_only),
                     str(intent.client_order_id),
+                    str(intent.expected_target_price),
+                    str(intent.is_maker),
                 )
             )
         )

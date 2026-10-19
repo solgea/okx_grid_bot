@@ -14,7 +14,7 @@ from datetime import datetime
 from ccxt.base.errors import RateLimitExceeded, RequestTimeout, NetworkError, ExchangeError
 
 # Yapılandırma
-from config.settings import config
+from config.settings import config, to_native_symbol
 
 # --- PREFLIGHT & ADAPTER IMPORTLARI ---
 from preflight_layer.validator import PreFlightValidator
@@ -99,7 +99,7 @@ async def main():
         async def consume_market_events():
             candles = deque(maxlen=100)
             async for event in exchange_adapter.market_events(
-                config.SYMBOL.replace("/", "-").replace(":USDT", "-SWAP"),
+                to_native_symbol(config.SYMBOL),
                 config.TIMEFRAME,
             ):
                 try:

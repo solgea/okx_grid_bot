@@ -68,7 +68,7 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand"><h1>Agent Desk</h1><p>OKX ETH-USDT-SWAP · Paper simülasyonu ve OKX Demo ayrı hesaplardır</p></div>
+      <div class="brand"><h1>Agent Desk</h1><p id="brand-instrument">OKX — · Paper simülasyonu ve OKX Demo ayrı hesaplardır</p></div>
       <div class="chips"><span class="chip"><span id="market-dot" class="dot"></span><span id="market-label">Fiyat akışı bekleniyor</span></span><span class="chip demo">Canlı hesap kullanılmaz</span></div>
     </header>
     <div class="notice"><b>Paper ve Demo hesapları ayrı.</b> Paper emirler yalnızca simüle edilir. Aşağıdaki onaylı Demo emirleri OKX Demo hesabına gönderilir.</div>
@@ -83,7 +83,7 @@
     <div class="workspace">
       <div class="stack">
         <section class="panel">
-          <div class="panel-head"><div><h2>OKX piyasa fiyatı</h2><div class="market-label">ETH-USDT-SWAP · her 3 saniyede güncellenir</div></div><span class="tag">Paper</span></div>
+          <div class="panel-head"><div><h2>OKX piyasa fiyatı</h2><div class="market-label" id="paper-instrument">— · her 3 saniyede güncellenir</div></div><span class="tag">Paper</span></div>
           <div id="price" class="market-price">— <span class="market-label">USDT</span></div>
           <div class="chart-wrap"><svg id="chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="Son fiyat hareketleri"></svg></div>
         </section>
@@ -108,8 +108,7 @@
               <label>Ajan adı<input id="agent-name" maxlength="40" value="Trend ajanı" required></label>
               <div class="field-row"><label>Kontrat<input id="agent-size" type="number" min="1" max="100" value="1" required></label><label>Kaldıraç<input id="agent-leverage" type="number" min="1" max="5" value="2" required></label></div>
               <button class="button" type="submit">Ajan oluştur</button>
-              <p class="hint">EMA 9/21 kesişimi · %10 zarar sınırı · en fazla 10 ajan</p>
-            </form>
+              <p class="hint">EMA 9/21 kesişimi · %10 zarar sınırı · en fazla 10 ajan</p>            </form>
           </details>
           <details open>
             <summary>Manuel paper emir</summary>
@@ -117,7 +116,7 @@
               <label>Ajan<select id="trade-agent" required></select></label>
               <div class="field-row"><label>Kontrat<input id="trade-size" type="number" min="1" max="100" value="1" required></label><label>Kaldıraç<input type="text" value="Ajana göre" disabled></label></div>
               <div class="button-row"><button class="button buy" type="button" id="buy-btn">Al / Long</button><button class="button sell" type="button" id="sell-btn">Sat / Short</button></div>
-              <p class="hint">1 kontrat = 0,01 ETH · komisyon simülasyonu %0,05</p>
+              <p class="hint" id="paper-contract-hint">1 kontrat = 0,01 birim · komisyon simülasyonu %0,05</p>
             </form>
           </details>
         </section>
@@ -168,6 +167,7 @@
     const $ = (id) => document.getElementById(id);
     let agents = [];
     let toastTimer;
+    let demoInstrument = "—";
     function money(value) {
       return value == null ? "—" : Number(value).toLocaleString("tr-TR", {minimumFractionDigits:2, maximumFractionDigits:2}) + " USDT";
     }
@@ -261,6 +261,7 @@
     }
     function renderDemo(state) {
       const container = $("demo-account");
+      demoInstrument = state.instrument || "—";
       if (!state.connected) {
         $("demo-submit").disabled = true;
         container.innerHTML = `<div class="demo-error">${escapeHtml(state.error || "OKX Demo hesabına henüz bağlanılamadı.")} API bilgileri hiçbir zaman sayfada gösterilmez; anahtarlar yalnızca yerel .env dosyasından okunur.</div>`;
@@ -281,6 +282,10 @@
         const demo = await request("/api/demo/state");
         $("market-dot").className = `dot ${state.market_connected ? "ok" : state.market_error ? "bad" : ""}`;
         $("market-label").textContent = state.market_connected ? "OKX fiyat akışı bağlı" : state.market_error ? "Fiyat akışı hatası" : "Fiyat akışı bekleniyor";
+        const instrument = state.instrument || "—";
+        $("brand-instrument").textContent = `OKX ${instrument} · Paper simülasyonu ve OKX Demo ayrı hesaplardır`;
+        $("paper-instrument").textContent = `${instrument} · her 3 saniyede güncellenir`;
+        $("paper-contract-hint").textContent = `1 kontrat = ${state.contract_size ?? "—"} birim · komisyon simülasyonu %0,05`;
         $("price").innerHTML = state.price == null ? "— <span class=\"market-label\">USDT</span>" : `${Number(state.price).toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})} <span class="market-label">USDT</span>`;
         $("equity").textContent = money(state.equity);
         $("balance-foot").textContent = `Bakiye ${money(state.balance)} · sanal başlangıç ${money(state.initial_balance)}`;
@@ -335,7 +340,7 @@
       const contracts = Number($("demo-contracts").value);
       const price = type === "limit" ? Number($("demo-price").value) : null;
       const priceMessage = type === "limit" ? `Limit fiyatı ${price} USDT` : "Piyasa fiyatı";
-      const orderMessage = `OKX DEMO emrini onaylıyor musunuz?\n\nYön: ${side === "buy" ? "Al / Long" : "Sat / Short"}\nTür: ${type === "limit" ? "Limit" : "Market"}\nEnstrüman: ETH-USDT-SWAP\nKontrat: ${contracts}\n${priceMessage}\n\nBu emir OKX Demo hesabına gönderilecek, paper hesaba değil.`;
+      const orderMessage = `OKX DEMO emrini onaylıyor musunuz?\n\nYön: ${side === "buy" ? "Al / Long" : "Sat / Short"}\nTür: ${type === "limit" ? "Limit" : "Market"}\nEnstrüman: ${demoInstrument}\nKontrat: ${contracts}\n${priceMessage}\n\nBu emir OKX Demo hesabına gönderilecek, paper hesaba değil.`;
       if (!window.confirm(orderMessage)) return;
       try {
         const result = await request("/api/demo/orders", {side, type, contracts, price, confirm:true});

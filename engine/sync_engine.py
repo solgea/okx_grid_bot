@@ -12,7 +12,6 @@ from enum import Enum
 from config.settings import config
 from strategy.order_reconciler import ExistingOrder, GridOrderSpec, OrderReconciler
 from preflight_layer.domain import ExecutionAuthorization
-from demo_exec.transport import OkxDemoTransport
 
 logger = logging.getLogger("OrderSyncEngine")
 _BATCH_SIZE = 20
@@ -175,11 +174,19 @@ class OrderSyncEngine:
 
     async def _amend_single_order(self, spec: Any) -> Any:
         try:
-            return await self.engine.exchange.edit_order(
-                id=spec.ord_id, symbol=config.SYMBOL, type="limit", side=None,
-                amount=float(spec.new_size), price=float(spec.new_price),
+            return await self.engine.edit_order(
+                order_id=spec.ord_id,
+                symbol=config.SYMBOL,
+                side=None,
+                amount=float(spec.new_size),
+                price=float(spec.new_price),
                 params=self._amend_params(spec),
             )
+        except PermissionError:
+            # An authorization denial is not a recoverable order failure.
+            # It must propagate so the caller stops instead of continuing
+            # to reconcile with a closed gate.
+            raise
         except Exception as exc:
             if _contains_error_code(exc, _FILLED_OR_CANCELLED_CODES) or "already been filled or canceled" in str(exc).lower():
                 logger.info("ℹ️ Emir [%s] borsa tarafında zaten gerçekleşti/iptal edildi; Amend atlandı.", spec.ord_id)
@@ -199,28 +206,15 @@ class OrderSyncEngine:
         await self._run_in_batches(amend_specs, self._amend_batch, batch_size=_BATCH_SIZE, delay_seconds=_BATCH_DELAY_SECONDS)
 
     async def _amend_batch(self, batch: list[Any]) -> None:
-        await asyncio.gather(*(self._amend_single_order(spec) for spec in batch), return_exceptions=True)
-
-    async def _place_single_order(self, spec: Any) -> Any:
-        try:
-            transport = OkxDemoTransport(
-                self.engine.exchange,
-                demo_phase="B",
-                is_demo=config.IS_DEMO,
-            )
-            return await transport.place_spec(
-                symbol=config.SYMBOL,
-                side=spec.side,
-                amount=float(spec.size),
-                price=float(spec.price),
-                params=self._order_params(spec),
-            )
-        except Exception as exc:
-            if _contains_error_code(exc, _INSUFFICIENT_FUNDS_CODES):
-                logger.warning("⚠️ Yetersiz Margin/Bakiye (Place). %s %s @ %s emri açılamadı.", spec.side.upper(), spec.size, spec.price)
-                return None
-            logger.error("Yeni emir iletimi başarısız: %s", exc)
-            return None
+        results = await asyncio.gather(
+            *(self._amend_single_order(spec) for spec in batch),
+            return_exceptions=True,
+        )
+        # Per-order failures stay isolated, but an authorization denial must
+        # not be hidden inside the batch result.
+        for result in results:
+            if isinstance(result, PermissionError):
+                raise result
 
     async def _place_orders_async(self, place_specs: list[Any]) -> None:
         await self._run_in_batches(place_specs, self._place_batch, batch_size=_BATCH_SIZE, delay_seconds=_BATCH_DELAY_SECONDS)

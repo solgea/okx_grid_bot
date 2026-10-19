@@ -2,6 +2,8 @@
 
 OKX swap ajanlarını yönetmek için Türkçe, yerel çalışan MVP. Herkese açık `ETH-USDT-SWAP` fiyatından ayrı sanal paper portföyü ve isteğe bağlı OKX Demo hesap paneli sunar. Paper portföyü `data/paper_state.json` dosyasında saklanır.
 
+Enstrüman `.env` içindeki `SYMBOL` değerinden türetilir (`ETH/USDT:USDT` -> `ETH-USDT-SWAP`). Bot, paper portföyü ve Demo paneli aynı sembolü kullanır; sembol `.env` ile değiştirildiğinde arayüz de otomatik olarak güncellenir.
+
 ## Çalıştırma
 
 ```powershell

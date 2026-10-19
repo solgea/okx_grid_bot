@@ -92,20 +92,20 @@ class RiskPreFlightAdapter(IRiskManager):
         Fiyat hareketinden önce komisyon ve kayma maliyetlerinin kârı yok edip etmeyeceğini denetler.
         """
         entry_price = float(intent.price)
-        
-        # Grid mimarisinde intent nesnesi içinde hedef fiyat (take_profit) bulunmalıdır.
-        # Eğer henüz intent nesnesinde yoksa, 'expected_target_price' özelliğini eklemelisiniz.
-        target_price = getattr(intent, 'expected_target_price', None)
-        
+
+        # Grid architecture requires an expected target on the intent. It is
+        # part of the authorization fingerprint, so it cannot be swapped after
+        # PreFlight has authorized the order.
+        target_price = intent.expected_target_price
         if not target_price:
             logger.warning(
                 "❌ PreFlight REDDİ: expected_target_price is required for friction validation."
             )
             return False
-            
-        is_maker = getattr(intent, 'is_maker', True) # Grid limit emirleri varsayılan olarak maker'dır
-        
-        return self.rm.check_trade_viability(entry_price, float(target_price), is_maker)
+
+        return self.rm.check_trade_viability(
+            entry_price, float(target_price), intent.is_maker
+        )
 
     def validate_risk(self, account, intent, metadata=None) -> bool:
         """

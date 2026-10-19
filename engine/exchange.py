@@ -176,6 +176,42 @@ class OKXEngine:
             logger.exception("Batch order submission failed")
             raise
 
+    async def edit_order(self, order_id, symbol=None, side=None, amount=None, price=None, params=None):
+        """Amend an existing order through the same authorization gate as placement.
+
+        The raw ccxt client must never be used for order mutation directly;
+        doing so bypasses DRY_RUN simulation and the live-trading gate.
+        """
+        symbol = symbol or config.SYMBOL
+        params = dict(params or {})
+        self._assert_mutation_authorized()
+        if config.DRY_RUN:
+            return {
+                "id": order_id,
+                "status": "simulated",
+                "side": side,
+                "amount": amount,
+                "price": price,
+                "params": params,
+            }
+        try:
+            order = await self.exchange.edit_order(
+                id=order_id,
+                symbol=symbol,
+                type="limit",
+                side=side,
+                amount=amount,
+                price=price,
+                params=params,
+            )
+            if not order or not order.get("id"):
+                raise RuntimeError("Exchange returned an amended order without an id")
+            return order
+        except Exception:
+            self.connected = False
+            logger.exception("Order amendment failed")
+            raise
+
     async def cancel_orders(self, order_ids, symbol=None):
         if not order_ids:
             return []

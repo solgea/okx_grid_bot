@@ -323,6 +323,12 @@ class GridEngine:
                         pos_dec += alloc
             if amount_dec > 0:
                 final_amount = self._quantize_size(amount_dec)
+                if is_take_profit:
+                    expected_target_price = entry_dec
+                elif side_str == "buy":
+                    expected_target_price = lvl + self._grid_step
+                else:
+                    expected_target_price = lvl - self._grid_step
                 intent = OrderIntent(
                     instrument_id=instrument_id,
                     side=OrderSide.BUY if side_str == "buy" else OrderSide.SELL,
@@ -333,15 +339,9 @@ class GridEngine:
                     margin_mode=config.MARGIN_MODE,
                     position_side="net",
                     reduce_only=is_take_profit,
-                    client_order_id=f"grid_{uuid.uuid4().hex[:6]}"
+                    client_order_id=f"grid_{uuid.uuid4().hex[:6]}",
+                    expected_target_price=expected_target_price,
+                    is_maker=True,
                 )
-                if is_take_profit:
-                    intent.expected_target_price = entry_dec
-                else:
-                    if side_str == "buy":
-                        intent.expected_target_price = lvl + self._grid_step
-                    else:
-                        intent.expected_target_price = lvl - self._grid_step
-                intent.is_maker = True
                 intents.append(intent)
         return intents
