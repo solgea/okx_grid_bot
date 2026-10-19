@@ -48,6 +48,7 @@ class TradingLoop:
         kill_switch: KillSwitch,
         stop_event: asyncio.Event,
         initial_balance: float,
+        instrument_metadata: Any,
         backoff: BackoffPolicy | None = None,
     ) -> None:
         self.engine = engine
@@ -61,6 +62,7 @@ class TradingLoop:
         self.kill_switch = kill_switch
         self.stop_event = stop_event
         self.initial_balance = initial_balance
+        self.instrument_metadata = instrument_metadata
         self.backoff = backoff or BackoffPolicy()
         self.last_position_size = 0.0
         self.last_realized_pnl = 0.0
@@ -244,7 +246,6 @@ class TradingLoop:
         entry_price: float,
         is_limit_breached: bool,
         current_account: Any,
-        instrument_metadata: Any,
     ) -> None:
         """Authorize the target orders and hand them to the sync engine."""
         target_orders = self.grid.get_target_orders(
@@ -269,7 +270,7 @@ class TradingLoop:
         )
         target_orders, execution_authorization = self.order_manager.authorize_intents(
             target_orders,
-            instrument_metadata,
+            self.instrument_metadata,
             current_account,
             preflight_market,
         )

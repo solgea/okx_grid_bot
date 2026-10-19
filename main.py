@@ -147,6 +147,7 @@ async def main():
             kill_switch=KillSwitch(engine, config.SYMBOL),
             stop_event=stop_event,
             initial_balance=initial_balance,
+            instrument_metadata=instrument_metadata,
             backoff=BackoffPolicy(),
         )
         await trading_loop.run()

@@ -1,56 +1,71 @@
 import os
-import pandas as pd
+import sys
+
 import numpy as np
+import pandas as pd
+
+EXPECTED_COLUMNS = [
+    "Timestamp", "Symbol", "Action", "Position_Size",
+    "Entry_Price", "Realized_PnL", "Unrealized_PnL",
+    "Net_Total_PnL", "Wallet_Balance",
+]
+
+
+def _enable_utf8_output():
+    """Allow emoji output on consoles that default to a legacy code page."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
+def load_trade_log(file_path):
+    """Read the trade journal into a DataFrame, or None when unusable."""
+    try:
+        # Read once, without a header, so a missing header row can be
+        # detected instead of silently shifting the columns.
+        df = pd.read_csv(file_path, header=None, sep=None, engine="python")
+    except Exception as e:
+        print(f"❌ CSV okuma hatası: {e}")
+        return None
+
+    if df.empty:
+        return None
+
+    first_row = [str(val).strip() for val in df.iloc[0]]
+    if "Timestamp" in first_row or "Symbol" in first_row:
+        # The first row is a header.
+        df.columns = df.iloc[0].str.strip()
+        df = df[1:].reset_index(drop=True)
+    elif len(df.columns) == len(EXPECTED_COLUMNS):
+        # No header row: assume the documented column order.
+        df.columns = EXPECTED_COLUMNS
+    else:
+        print(
+            f"❌ Sütun sayısı uyumsuz. Beklenen: {len(EXPECTED_COLUMNS)}, "
+            f"Bulunan: {len(df.columns)}"
+        )
+        return None
+
+    df.columns = df.columns.str.strip()
+    return df
+
 
 def analyze_portfolio(file_path="trade_execution_log.csv"):
+    _enable_utf8_output()
+
     if not os.path.exists(file_path):
         print(f"❌ HATA: Dosya bulunamadı -> '{file_path}'")
         print("Lütfen botun çalışıp en az bir işlem kaydı ürettiğinden emin olun.")
         return
 
-    try:
-        # sep=None ayırıcıyı otomatik bulur. Sütun isimlerindeki görünmez boşlukları temizler.
-        df = pd.read_csv(file_path, sep=None, engine='python')
-        df.columns = df.columns.str.strip()
-        
-        # Hata devam ederse CSV'deki gerçek başlıkları görmek için aşağıdaki satırı kullanın:
-        #print("🔍 CSV'deki Gerçek Sütunlar:", df.columns.tolist())
-        
-    except Exception as e:
-        print(f"❌ CSV okuma hatası: {e}")
-        return
-
-    if df.empty:
-        print("⚠️ CSV dosyası boş, henüz veri kaydedilmemiş.")
-        return
-
-    expected_columns = [
-        "Timestamp", "Symbol", "Action", "Position_Size", 
-        "Entry_Price", "Realized_PnL", "Unrealized_PnL", 
-        "Net_Total_PnL", "Wallet_Balance"
-    ]
-
-    try:
-        # Önce dosyayı başlıksız (header=None) olarak oku
-        df = pd.read_csv(file_path, header=None, sep=None, engine='python')
-        
-        # İlk satırın başlık mı yoksa veri mi olduğunu kontrol et
-        first_row = [str(val).strip() for val in df.iloc[0]]
-        
-        if "Timestamp" in first_row or "Symbol" in first_row:
-            # İlk satır zaten başlıksa, başlık olarak ayarla
-            df.columns = df.iloc[0].str.strip()
-            df = df[1:].reset_index(drop=True)
-        else:
-            # Başlık satırı yoksa (Doğrudan veri yazılmışsa) tanımlı sütunları at
-            if len(df.columns) == len(expected_columns):
-                df.columns = expected_columns
-            else:
-                print(f"❌ Sütun sayısı uyumsuz. Beklenen: {len(expected_columns)}, Bulunan: {len(df.columns)}")
-                return
-
-    except Exception as e:
-        print(f"❌ CSV okuma hatası: {e}")
+    df = load_trade_log(file_path)
+    if df is None:
+        if os.path.exists(file_path) and os.path.getsize(file_path) == 0:
+            print("⚠️ CSV dosyası boş, henüz veri kaydedilmemiş.")
         return
 
     # Sayısal Veri Tiplerini Dönüştürme
@@ -136,4 +151,6 @@ def analyze_portfolio(file_path="trade_execution_log.csv"):
     print("="*56 + "\n")
 
 if __name__ == "__main__":
-    analyze_portfolio()
+    import sys
+
+    analyze_portfolio(sys.argv[1] if len(sys.argv) > 1 else "trade_execution_log.csv")

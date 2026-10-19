@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -11,11 +12,12 @@ class RecoveryResult:
 class Recovery:
     def recover(self, journal_path: str, *, last_seq: int | None = None) -> RecoveryResult:
         try:
-            rows = [json.loads(x) for x in open(journal_path, encoding="utf-8").read().splitlines() if x]
+            content = Path(journal_path).read_text(encoding="utf-8")
+            rows = [json.loads(x) for x in content.splitlines() if x]
         except (OSError, json.JSONDecodeError):
             return RecoveryResult("BLOCKED", "E_JOURNAL_CORRUPT")
         seqs = [int(r["seq"]) for r in rows if "seq" in r]
-        if any(b != a + 1 for a, b in zip(seqs, seqs[1:])):
+        if any(b != a + 1 for a, b in zip(seqs, seqs[1:], strict=False)):
             return RecoveryResult("BLOCKED", "E_SEQ_GAP")
         if last_seq is not None and seqs and seqs[-1] != last_seq:
             return RecoveryResult("BLOCKED", "E_SEQ_GAP")

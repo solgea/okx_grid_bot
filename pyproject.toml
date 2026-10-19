@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "okx-grid-bot"
+version = "0.1.0"
+description = "OKX swap grid bot with a local paper-trading and Demo dashboard"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools]
+packages = [
+    "adapters",
+    "bot",
+    "config",
+    "demo_exec",
+    "engine",
+    "preflight_layer",
+    "strategy",
+    "web",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "strict"
+filterwarnings = [
+    "error::DeprecationWarning:preflight_layer.*",
+    "error::DeprecationWarning:engine.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Correctness rules only. Style and formatting are not enforced so that a
+# lint failure always points at a possible defect rather than a preference.
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = [
+    "E712",  # comparison to True/False is explicit in the existing tests
+    "B008",  # function call in default argument
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402", "F401", "F841"]

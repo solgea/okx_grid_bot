@@ -30,8 +30,13 @@ class FakeExchange:
     async def privateGetAccountBills(self, p): return await self._get("bills", {"data": []}, p)
     async def publicGetPublicFundingRate(self, p): return await self._get("fr", {"data": [{"fundingRate": "0.0001", "nextFundingTime": "1"}]}, p)
     # mutating surface that must be blocked
-    def privatePostTradeOrder(self, p): self.calls.append("MUTATION"); return {}
-    def create_order(self, *a): self.calls.append("MUTATION"); return {}
+    def privatePostTradeOrder(self, p):
+        self.calls.append("MUTATION")
+        return {}
+
+    def create_order(self, *a):
+        self.calls.append("MUTATION")
+        return {}
 
 
 def run(coro):
@@ -58,7 +63,8 @@ def test_harden_blocks_every_mutation_and_keeps_reads():
 
 
 def test_run_checks_reports_values_and_marks_unprovable_items():
-    ex = FakeExchange(); chk.harden(ex)
+    ex = FakeExchange()
+    chk.harden(ex)
     res = run(chk.run_checks(ex, "ETH/USDT:USDT"))
     assert res["pos_mode"]["posMode"] == "net_mode" and res["instrument"]["tickSz"] == "0.01"
     assert res["fee_rates"]["taker"] == "-0.0005" and res["algo_pending_query"]["pending_conditional_orders"] == 0
@@ -83,7 +89,8 @@ def test_empty_swap_fee_rates_are_recorded_as_no_data():
     assert chk.summarize(res)["failed"] == []
 
 def test_failures_are_isolated_and_secrets_are_scrubbed():
-    ex = FakeExchange(fail={"algo"}); chk.harden(ex)
+    ex = FakeExchange(fail={"algo"})
+    chk.harden(ex)
     res = run(chk.run_checks(ex, "ETH/USDT:USDT", secrets=("secret-key",)))
     assert res["algo_pending_query"]["status"] == "FAIL" and "secret-key" not in res["algo_pending_query"]["detail"]
     assert res["pos_mode"]["status"] == "OK"                 # other checks still ran

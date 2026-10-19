@@ -33,7 +33,7 @@ Core implementation areas:
 - [bot/](bot) — runtime components: market state, market consumer, trading loop, kill switch, retry policy, trade journal.
 - [web/](web) — loopback-only dashboard HTTP layer and routing.
 - [demo_exec/](demo_exec) — Phase-A shadow execution contracts.
-- [tests/](tests) and [preflight_layer/tests/](preflight_layer/tests) — pytest coverage for trading, safety, and execution behavior.
+- [tests/](tests) — pytest coverage for trading, safety, and execution behavior.
 
 ## Safety boundaries
 

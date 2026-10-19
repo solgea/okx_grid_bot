@@ -12,7 +12,7 @@ import logging
 from collections import deque
 from typing import Any
 
-import pandas_ta_classic as ta
+import pandas as pd
 
 from bot.market_state import MarketState
 from strategy.grid_engine import GridEngine
@@ -61,7 +61,7 @@ class MarketConsumer:
 
     async def _analyze_candles(self, candles: deque[Any], price: float) -> None:
         """Derive SMC data from the candle history and update the grid."""
-        frame = ta.DataFrame(
+        frame = pd.DataFrame(
             list(candles),
             columns=CANDLE_COLUMNS,
         )

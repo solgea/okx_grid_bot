@@ -6,7 +6,7 @@ the URL contract is visible in one place.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 # Each agent action maps to the manager call that performs it.
 AGENT_ACTIONS: dict[str, str] = {
