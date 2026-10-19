@@ -12,6 +12,7 @@ from preflight_layer.domain import (
     OrderSide,
     OrderType,
 )
+from preflight_layer.sizing import contract_notional
 from preflight_layer.validator import PreFlightValidator
 
 
@@ -52,7 +53,7 @@ def test_linear_swap_notional_includes_contract_value():
     adapter = RiskPreFlightAdapter(risk)
 
     # 1 contract × 0.01 BTC × 60,000 = 600 USDT notional.
-    assert adapter._contract_notional(intent(), metadata()) == Decimal("600.00")
+    assert contract_notional(intent(), metadata()) == Decimal("600.00")
 
 
 def test_inverse_swap_notional_uses_contract_value_over_price():
@@ -61,7 +62,7 @@ def test_inverse_swap_notional_uses_contract_value_over_price():
     adapter = RiskPreFlightAdapter(risk)
 
     # 1 contract × 100 USD / 60,000 = 0.001666... BTC notional.
-    value = adapter._contract_notional(intent(), metadata("100", "inverse"))
+    value = contract_notional(intent(), metadata("100", "inverse"))
     assert value == Decimal("100") / Decimal("60000")
 
 

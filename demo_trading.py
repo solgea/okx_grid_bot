@@ -89,20 +89,15 @@ class DemoTradingManager:
                     for order in orders_response
                     if order.get("symbol") == symbol
                 ]
-                state = {
-                    "mode": "demo",
-                    "configured": True,
-                    "connected": True,
-                    "account": "OKX Demo",
-                    "symbol": symbol,
-                    "instrument": self.native_symbol,
-                    "balance": self._number(balance.get("free")),
-                    "total_balance": self._number(balance.get("total")),
-                    "positions": positions,
-                    "open_orders": orders,
-                    "error": None,
-                    "refreshed_at": time.time(),
-                }
+                state = self._state(
+                    connected=True,
+                    balance=self._number(balance.get("free")),
+                    total_balance=self._number(balance.get("total")),
+                    positions=positions,
+                    open_orders=orders,
+                    error=None,
+                    refreshed_at=time.time(),
+                )
                 self._last_error = None
                 self._last_state = state
                 self._last_state_at = time.monotonic()
@@ -262,18 +257,36 @@ class DemoTradingManager:
             return None
         return number if math.isfinite(number) else None
 
-    def _state_error(self, error: str) -> dict[str, Any]:
+    def _state(
+        self,
+        *,
+        connected: bool,
+        balance: float | None = None,
+        total_balance: float | None = None,
+        positions: list[dict[str, Any]] | None = None,
+        open_orders: list[dict[str, Any]] | None = None,
+        error: str | None = None,
+        refreshed_at: float | None = None,
+    ) -> dict[str, Any]:
+        """Build a Demo panel state payload.
+
+        Single source of truth for the payload shape so the connected and
+        disconnected states cannot drift apart.
+        """
         return {
             "mode": "demo",
             "configured": self.configured,
-            "connected": False,
+            "connected": connected,
             "account": "OKX Demo",
             "symbol": self.symbol,
             "instrument": self.native_symbol,
-            "balance": None,
-            "total_balance": None,
-            "positions": [],
-            "open_orders": [],
+            "balance": balance,
+            "total_balance": total_balance,
+            "positions": positions or [],
+            "open_orders": open_orders or [],
             "error": error,
-            "refreshed_at": None,
+            "refreshed_at": refreshed_at,
         }
+
+    def _state_error(self, error: str) -> dict[str, Any]:
+        return self._state(connected=False, error=error)

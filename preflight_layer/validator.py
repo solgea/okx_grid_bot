@@ -14,6 +14,7 @@ from preflight_layer.domain import (
     PF015_INVALID_LEVERAGE, PF016_LEVERAGE_EXCEEDED, PF017_INSUFFICIENT_MARGIN,
     PF018_MAX_SIZE_EXCEEDED, PF025_STALE_MARKET_DATA, PF026_MARKET_DATA_UNAVAILABLE, PF027_ACCOUNT_CONFIGURATION_INVALID, PF029_KILL_SWITCH, PF030_TRADING_HALTED,
 )
+from preflight_layer.sizing import contract_notional
 
 
 logger = logging.getLogger("PreFlightValidator")
@@ -33,21 +34,6 @@ class PreFlightValidator:
         self.risk_manager = risk_manager
         self.policy = policy or RiskPolicy.from_config()
         self.state = PreFlightState.CREATED
-
-    @staticmethod
-    def _contract_notional(intent: OrderIntent, metadata: InstrumentMetadata) -> Decimal:
-        """Return quote-currency notional for linear/inverse OKX contracts."""
-        contracts = intent.size
-        price = intent.price
-        ct_val = metadata.contract_val
-        if contracts <= 0 or price <= 0 or ct_val <= 0:
-            raise ValueError("Invalid contract sizing inputs")
-        contract_type = metadata.contract_type.lower()
-        if contract_type == "linear":
-            return contracts * ct_val * price
-        if contract_type == "inverse":
-            return contracts * ct_val / price
-        raise ValueError(f"Unsupported contract type: {metadata.contract_type}")
 
     @staticmethod
     def _reject(result, code, message):
@@ -140,7 +126,7 @@ class PreFlightValidator:
             return result
 
         try:
-            estimated_notional = self._contract_notional(intent, metadata)
+            estimated_notional = contract_notional(intent, metadata)
         except ValueError as exc:
             self.state = self._reject(result, PF013_INVALID_CONTRACT_VALUE, str(exc))
             return result

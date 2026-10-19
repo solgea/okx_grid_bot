@@ -3,6 +3,7 @@ from decimal import Decimal
 from preflight_layer.interfaces import IRiskManager
 from engine.risk_manager import RiskManager
 from preflight_layer.risk_policy import RiskPolicy
+from preflight_layer.sizing import contract_notional
 
 logger = logging.getLogger("RiskPreFlightAdapter")
 
@@ -20,20 +21,7 @@ class RiskPreFlightAdapter(IRiskManager):
         Şimdilik FSM'in 'Durduruldu' (Halted) durumlarını kill-switch ile aynı kabul ediyoruz.
         Gelecekte borsa bakımı veya websocket kesintileri için genişletilebilir.
         """
-        return self.rm.kill_switch_triggered or self.rm.trading_halted
-
-    @staticmethod
-    def _contract_notional(intent, metadata) -> Decimal:
-        contracts = intent.size
-        price = intent.price
-        ct_val = metadata.contract_val
-        if contracts <= 0 or price <= 0 or ct_val <= 0:
-            raise ValueError("Invalid contract sizing inputs")
-        if metadata.contract_type.lower() == "linear":
-            return contracts * ct_val * price
-        if metadata.contract_type.lower() == "inverse":
-            return contracts * ct_val / price
-        raise ValueError(f"Unsupported contract type: {metadata.contract_type}")
+        return self.is_kill_switch_active()
 
     def validate_position_limits(self, account, intent, metadata=None) -> bool:
         """
@@ -69,7 +57,7 @@ class RiskPreFlightAdapter(IRiskManager):
             logger.error("❌ PreFlight REDDİ: contract metadata is required for capital sizing.")
             return False
         try:
-            estimated_cost = self._contract_notional(intent, metadata)
+            estimated_cost = contract_notional(intent, metadata)
         except ValueError as exc:
             logger.error("❌ PreFlight REDDİ: %s", exc)
             return False

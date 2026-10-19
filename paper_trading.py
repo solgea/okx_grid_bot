@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from collections import deque
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +50,8 @@ class PaperTradingManager:
         self._positions: dict[str, dict[str, float]] = {}
         self._agents: dict[str, dict[str, Any]] = {}
         self._fills: deque[dict[str, Any]] = deque(maxlen=100)
+        self._save_depth = 0
+        self._save_pending = False
         self._load_state()
 
     def start_market_feed(self) -> None:
@@ -103,9 +106,12 @@ class PaperTradingManager:
             self._market_updated_at = now
             self._market_error = None
             self._price_history.append(float(price))
-            for agent in list(self._agents.values()):
-                self._update_agent(agent, float(price))
-            self._save_state()
+            with self._deferred_save():
+                for agent in list(self._agents.values()):
+                    self._update_agent(agent, float(price))
+                # Mark the tick as dirty even when no agent changed state,
+                # so the price history is persisted as well.
+                self._save_state()
 
     def create_agent(
         self, name: str, contracts: int = 1, leverage: int = 2
@@ -467,7 +473,30 @@ class PaperTradingManager:
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise RuntimeError(f"Paper trading state could not be loaded: {self.state_path}") from exc
 
+    @contextmanager
+    def _deferred_save(self):
+        """Coalesce state writes that happen inside the block into one write.
+
+        The market feed updates every agent on every tick, and each agent
+        update used to persist the whole portfolio on its own. Deferring the
+        write keeps the state on disk correct while writing it once per tick.
+        """
+        self._save_depth += 1
+        try:
+            yield
+        finally:
+            self._save_depth -= 1
+            if self._save_depth == 0 and self._save_pending:
+                self._save_pending = False
+                self._write_state()
     def _save_state(self) -> None:
+        """Persist the portfolio, or defer it while a deferred block is open."""
+        if self._save_depth:
+            self._save_pending = True
+            return
+        self._write_state()
+
+    def _write_state(self) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         state = {
             "initial_balance": self._initial_balance,
