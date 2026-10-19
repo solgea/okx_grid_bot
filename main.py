@@ -30,7 +30,6 @@ from strategy.smc_engine import SMCVolumeEngine
 from preflight_layer.domain import MarketData
 from engine.risk_manager import RiskManager
 from engine.sync_engine import OrderSyncEngine
-from adapters.market_stream import MarketEvent
 from preflight_layer.cache import load_state, save_state
 
 # Loglama Ayarları
@@ -321,7 +320,7 @@ async def main():
                         logger.error(f"🔁 Yeniden bağlanma başarısız: {reconnect_error}")
                 await asyncio.sleep(sleep_time)
 
-            except NetworkError as net_err:
+            except NetworkError:
                 retry_count += 1
                 sleep_time = min(max_delay, base_delay * (backoff_factor ** retry_count))
                 logger.error(f"🔌 Ağ Bağlantı Hatası. {sleep_time} saniye bekleniyor... (Deneme: {retry_count})")

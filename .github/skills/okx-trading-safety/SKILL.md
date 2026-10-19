@@ -42,7 +42,6 @@ This repository has explicit patterns that should be preserved:
 
 Key project areas to review when adding or changing controls:
 - [preflight_layer/](../../preflight_layer)
-- [risk/](../../risk)
 - [engine/](../../engine)
 - [strategy/](../../strategy)
 - [app.py](../../app.py)

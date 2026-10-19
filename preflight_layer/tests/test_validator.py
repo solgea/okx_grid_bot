@@ -11,7 +11,6 @@ from preflight_layer.domain import (
     MarketData, 
     PreFlightState
 )
-from preflight_layer import codes
 from preflight_layer.validator import PreFlightValidator
 from preflight_layer.interfaces import IRiskManager
 
@@ -225,9 +224,12 @@ async def test_order_manager_uses_latest_async_websocket_market_snapshot(
         metadata=valid_metadata,
     )
 
-    accepted = await OrderManager(adapter, validator).execute_intent(valid_intent)
+    accepted, authorization = await OrderManager(adapter, validator).authorize_intent(
+        valid_intent
+    )
 
     assert accepted is True
+    assert authorization.authorized is True
     assert adapter.latest_market == {
         "bidPx": "10.4",
         "askPx": "10.6",
@@ -265,9 +267,12 @@ async def test_order_manager_rejects_order_using_async_metadata_update(
         metadata=updated_metadata,
     )
 
-    accepted = await OrderManager(adapter, validator).execute_intent(valid_intent)
+    accepted, authorization = await OrderManager(adapter, validator).authorize_intent(
+        valid_intent
+    )
 
     assert accepted is False
+    assert authorization.authorized is False
     assert validator.state == PreFlightState.REJECTED
 
 def test_account_leverage_must_be_positive(monkeypatch, valid_intent, valid_metadata):

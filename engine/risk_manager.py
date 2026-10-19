@@ -131,6 +131,13 @@ class RiskManager:
         self._state_dirty = True
 
     def update_after_trade(self, current_balance: float, last_trade_pnl: float):
+        """Re-evaluate the risk regime after a realized trade.
+
+        Not yet wired into the trading loop: _evaluate_regime currently runs
+        only on balance initialization and state restore, so the regime stays
+        at its initial value for the whole session. This method is the hook
+        for that wiring; see the risk-regime follow-up in the audit report.
+        """
         if last_trade_pnl > 0 and self.current_regime == RiskRegime.DEFENSIVE:
             self.safe_haven += last_trade_pnl * 0.5
         if current_balance > self.peak_balance:

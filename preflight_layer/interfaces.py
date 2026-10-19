@@ -5,7 +5,6 @@ from preflight_layer.domain import (
     InstrumentMetadata,
     MarketData,
     OrderIntent,
-    ValidationResult,
 )
 
 
@@ -28,10 +27,4 @@ class IRiskManager(ABC):
 
     @abstractmethod
     def validate_risk(self, account: AccountState, intent: OrderIntent, metadata: InstrumentMetadata | None = None) -> bool:
-        raise NotImplementedError
-
-
-class IPreFlightValidator(ABC):
-    @abstractmethod
-    def validate(self, intent: OrderIntent) -> ValidationResult:
         raise NotImplementedError

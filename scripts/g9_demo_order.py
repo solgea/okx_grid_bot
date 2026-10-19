@@ -3,11 +3,10 @@ import json
 import os
 import sys
 import time
-from decimal import Decimal
 
 from config.settings import config
 from engine.exchange import OKXEngine
-from preflight_layer.domain import AccountState, MarketData, OrderIntent, OrderSide, OrderType
+from preflight_layer.domain import OrderIntent, OrderSide, OrderType
 from preflight_layer.validator import PreFlightValidator
 from adapters.okx_adapter import OKXPreFlightAdapter
 

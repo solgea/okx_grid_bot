@@ -1,13 +1,10 @@
 import logging
-from preflight_layer.domain import OrderIntent, PreFlightState, ExecutionAuthorization
 
-# IExchangeAdapter eğer interfaces içinde yoksa duck-typing ile geçilebilir, 
-# varsa bu satırı aktif bırakabilirsin.
-# from preflight_layer.interfaces import IExchangeAdapter 
-
+from preflight_layer.domain import ExecutionAuthorization
 from preflight_layer.validator import PreFlightValidator
 
 logger = logging.getLogger("OrderManager")
+
 
 class OrderManager:
     def __init__(self, adapter, validator: PreFlightValidator):
@@ -36,26 +33,32 @@ class OrderManager:
         return accepted, authorization
 
     def validate_intents(self, intents, metadata, account, market):
-        """Backward-compatible validation helper; execution must use authorize_intents."""
+        """Deprecated compatibility shim. Execution must use authorize_intents.
+
+        Kept only for unmerged branches that still call this name; it discards
+        the authorization token, so it cannot be used to reach execution.
+        """
         accepted, _ = self.authorize_intents(intents, metadata, account, market)
         return accepted
 
-    async def execute_intent(self, intent: OrderIntent) -> bool:
-        logger.info(f"Received OrderIntent for {intent.instrument_id}")
-        
-        # Borsa ve hesap verilerini topla
-        metadata = await self.adapter.fetch_instrument_metadata(intent.instrument_id)
-        account = await self.adapter.fetch_account_state()
-        market = await self.adapter.fetch_market_data(intent.instrument_id)
-        
-        # PreFlight (Uçuş Öncesi) Doğrulama Boru Hattı
-        result = self.validator.validate(intent, metadata, account, market)
-        
-        if not result.passed or self.validator.state != PreFlightState.AUTHORIZED:
-            logger.error(f"Order intent rejected by PreFlight: {result.rejection_code} - {result.message}")
-            return False
-            
-        logger.info(f"PreFlight PASSED. Executing order for {intent.instrument_id}.")
-        # Burada adapter üzerinden işlem borsaya iletilecek. Örn:
-        # await self.adapter.place_order(intent)
-        return True
+    async def authorize_intent(self, intent, adapter=None):
+        """Authorize a single intent, pulling fresh state from the adapter.
+
+        Returns (accepted, authorization). The authorization token is the only
+        way to reach execution; this method never places an order itself.
+        """
+        source = adapter or self.adapter
+        metadata = await source.fetch_instrument_metadata(intent.instrument_id)
+        account = await source.fetch_account_state()
+        market = await source.fetch_market_data(intent.instrument_id)
+
+        accepted, authorization = self.authorize_intents(
+            [intent], metadata, account, market
+        )
+        if not accepted:
+            logger.warning(
+                "Order intent rejected by PreFlight: %s - %s",
+                authorization.rejection_code,
+                authorization.message,
+            )
+        return bool(accepted), authorization

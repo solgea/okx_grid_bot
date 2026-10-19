@@ -2,7 +2,6 @@ import logging
 from decimal import Decimal
 from preflight_layer.interfaces import IRiskManager
 from engine.risk_manager import RiskManager
-from config.settings import config
 from preflight_layer.risk_policy import RiskPolicy
 
 logger = logging.getLogger("RiskPreFlightAdapter")

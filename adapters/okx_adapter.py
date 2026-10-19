@@ -64,7 +64,6 @@ class OKXPreFlightAdapter(IExchangeAdapter):
         Enstrümanın anlık tahta, gösterge (mark) ve endeks fiyatlarını çeker.
         """
         ticker = await self.okx.exchange.fetch_ticker(instrument_id)
-        raw_info = ticker.get('info', {})
         last = Decimal(str(ticker.get("last") or 0))
         bid = Decimal(str(ticker.get("bid") or last))
         ask = Decimal(str(ticker.get("ask") or last))

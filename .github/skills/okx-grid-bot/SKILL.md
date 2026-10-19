@@ -33,9 +33,9 @@ This project handles live trading workflows and OKX exchange access. Follow thes
 
 ## Primary areas of the codebase
 - Application and entry points: [app.py](../../app.py), [main.py](../../main.py), [demo_trading.py](../../demo_trading.py), [paper_trading.py](../../paper_trading.py)
-- Trading logic: [strategy/](../../strategy), [engine/](../../engine), [risk/](../../risk)
+- Trading logic: [strategy/](../../strategy), [engine/](../../engine)
 - Safety / validation layer: [preflight_layer/](../../preflight_layer)
-- Orchestration: [orchestrator/](../../orchestrator)
+- Exchange and risk adapters: [adapters/](../../adapters)
 - Tests: [tests/](../../tests)
 
 ## Working approach

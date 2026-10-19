@@ -27,11 +27,11 @@ Primary entry points:
 Core implementation areas:
 
 - [strategy/](strategy) — grid and signal logic.
-- [engine/](engine) — exchange and execution primitives.
-- [risk/](risk) — risk management logic and limits.
+- [engine/](engine) — exchange and execution primitives, including risk management and limits.
+- [adapters/](adapters) — exchange and risk adapters for the PreFlight layer.
 - [preflight_layer/](preflight_layer) — validation, order manager, and safety gates.
-- [orchestrator/](orchestrator) — runtime orchestration and agent-style task handling.
-- [tests/](tests) and [orchestrator/tests/](orchestrator/tests) — pytest coverage for trading, safety, and orchestration behavior.
+- [demo_exec/](demo_exec) — Phase-A shadow execution contracts.
+- [tests/](tests) and [preflight_layer/tests/](preflight_layer/tests) — pytest coverage for trading, safety, and execution behavior.
 
 ## Safety boundaries
 
