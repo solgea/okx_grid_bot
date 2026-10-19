@@ -30,6 +30,8 @@ Core implementation areas:
 - [engine/](engine) — exchange and execution primitives, including risk management and limits.
 - [adapters/](adapters) — exchange and risk adapters for the PreFlight layer.
 - [preflight_layer/](preflight_layer) — validation, order manager, and safety gates.
+- [bot/](bot) — runtime components: market state, market consumer, trading loop, kill switch, retry policy, trade journal.
+- [web/](web) — loopback-only dashboard HTTP layer and routing.
 - [demo_exec/](demo_exec) — Phase-A shadow execution contracts.
 - [tests/](tests) and [preflight_layer/tests/](preflight_layer/tests) — pytest coverage for trading, safety, and execution behavior.
 
