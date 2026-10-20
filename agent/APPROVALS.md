@@ -26,7 +26,7 @@ The Phase-A acceptance criteria are objectively satisfied in the repository:
 
 | Criterion | Evidence | Result |
 |---|---|---|
-| 3 consecutive UTC days | `artifacts/phase_a/2026-10-10.json` … `2026-10-19.json` (10 consecutive passing days) | PASS |
+| 3 consecutive UTC days | `artifacts/phase_a/2026-10-10.json` … `2026-10-20.json` (12 consecutive passing days) | PASS |
 | Zero unexpected exchange order calls | every daily record reports `null_transport_only=true`, `unexpected_exchange_order_calls=0` | PASS |
 | Zero unresolved incidents | every daily record reports `incidents=[]` | PASS |
 | Section 11 OKX verification record | `artifacts/phase_a/okx-demo-assumptions-readonly-2026-10-12.json` | PASS |
