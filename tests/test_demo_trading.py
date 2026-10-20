@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -27,11 +28,29 @@ class FakeOKXDemo:
         self.calls.append(("load_markets",))
         self.markets[CCXT_SYMBOL] = {
             "limits": {"amount": {"min": 0.01}},
+            "precision": {"price": 0.1, "amount": 0.01},
+            "info": {
+                "minSz": "0.01",
+                "lotSz": "0.01",
+                "tickSz": "0.1",
+                "ctVal": "0.01",
+                "ctType": "linear",
+                "state": "live",
+            },
         }
         return self.markets
 
     def fetch_balance(self):
         return {"USDT": {"free": "100", "total": "125"}}
+
+    def fetch_ticker(self, symbol):
+        assert symbol == CCXT_SYMBOL
+        return {
+            "last": 3500.0,
+            "bid": 3499.9,
+            "ask": 3500.1,
+            "timestamp": int(time.time() * 1000),
+        }
 
     def fetch_positions(self, symbols):
         assert symbols == [CCXT_SYMBOL]
@@ -82,6 +101,10 @@ def demo_exchange(monkeypatch):
     monkeypatch.setattr(config, "API_SECRET", "demo-secret")
     monkeypatch.setattr(config, "PASSPHRASE", "demo-passphrase")
     monkeypatch.setattr(config, "IS_DEMO", True)
+    # A real Demo submission requires DRY_RUN=false and the kill switch
+    # released, exactly like the G9 gate.
+    monkeypatch.setattr(config, "DRY_RUN", False)
+    monkeypatch.setattr(config, "KILL_SWITCH_ACTIVE", False)
     instances = []
 
     def factory(credentials):

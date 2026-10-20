@@ -139,7 +139,7 @@
               <label id="demo-price-field">Limit fiyatı (USDT)<input id="demo-price" type="number" min="0" step="any" placeholder="Örn. 3500" required></label>
             </div>
             <button id="demo-submit" class="button" type="submit" disabled>Demo emrini incele ve onayla</button>
-            <p class="hint">Yalnızca OKX Demo ortamı · hesabın kaldıraç ayarı değiştirilmez · her emir ayrıca onay ister.</p>
+            <p class="hint" id="demo-order-hint">Yalnızca OKX Demo ortamı · hesabın kaldıraç ayarı değiştirilmez · her emir ayrıca onay ister.</p>
           </form>
         </div>
         <div>
@@ -262,6 +262,10 @@
     function renderDemo(state) {
       const container = $("demo-account");
       demoInstrument = state.instrument || "—";
+      const blockReason = state.order_block_reason;
+      $("demo-order-hint").textContent = blockReason
+        ? blockReason
+        : "Yalnızca OKX Demo ortamı · hesabın kaldıraç ayarı değiştirilmez · her emir ayrıca onay ister.";
       if (!state.connected) {
         $("demo-submit").disabled = true;
         container.innerHTML = `<div class="demo-error">${escapeHtml(state.error || "OKX Demo hesabına henüz bağlanılamadı.")} API bilgileri hiçbir zaman sayfada gösterilmez; anahtarlar yalnızca yerel .env dosyasından okunur.</div>`;
@@ -269,7 +273,7 @@
         $("demo-orders").innerHTML = '<div class="empty">Demo hesabı bağlantısı kurulmadı.</div>';
         return;
       }
-      $("demo-submit").disabled = false;
+      $("demo-submit").disabled = Boolean(blockReason);
       container.innerHTML = `<div class="demo-summary"><span>Hesap <b>OKX Demo</b></span><span>Serbest USDT <b>${money(state.balance)}</b></span><span>Toplam USDT <b>${money(state.total_balance)}</b></span><span>Enstrüman <b>${escapeHtml(state.instrument)}</b></span></div>`;
       $("demo-positions").innerHTML = state.positions.length ? state.positions.map((position) => `
         <div class="agent"><div class="agent-top"><div><div class="agent-name">${position.side === "long" ? "Long" : "Short"} · ${position.contracts} kontrat</div><div class="agent-meta">Giriş ${money(position.entry_price)} · piyasa ${money(position.mark_price)} · kaldıraç ${position.leverage ?? "—"}×</div></div><strong class="${(position.unrealized_pnl ?? 0) >= 0 ? "positive" : "negative"}">${money(position.unrealized_pnl)}</strong></div></div>`).join("") : '<div class="empty">Demo hesabında açık pozisyon yok.</div>';

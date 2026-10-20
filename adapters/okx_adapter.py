@@ -2,6 +2,11 @@ import logging
 from decimal import Decimal
 from preflight_layer.interfaces import IExchangeAdapter
 from preflight_layer.domain import InstrumentMetadata, AccountState, MarketData
+from preflight_layer.exchange_data import (
+    account_state_from_balance,
+    instrument_metadata_from_market,
+    market_data_from_ticker,
+)
 from engine.exchange import OKXEngine
 from adapters.market_stream import OKXMarketStream
 from config.settings import config
@@ -33,30 +38,15 @@ class OKXPreFlightAdapter(IExchangeAdapter):
         bilgilerini alarak Domain modeline dönüştürür.
         """
         market = self.okx.exchange.market(instrument_id)
-        raw_info = market.get('info', {})
-
-        return InstrumentMetadata(
-            symbol=instrument_id,
-            min_size=Decimal(str(raw_info.get("minSz", market["limits"]["amount"]["min"]))),
-            tick_size=Decimal(str(raw_info.get("tickSz", market["precision"]["price"]))),
-            lot_size=Decimal(str(raw_info.get("lotSz", market["precision"]["amount"]))),
-            contract_val=Decimal(str(raw_info.get("ctVal", "0"))),
-            contract_val_ccy=str(raw_info.get("ctValCcy", "")),
-            contract_type=str(raw_info.get("ctType", "linear")).lower(),
-            is_live=raw_info.get("state", "live") == "live",
-        )
+        return instrument_metadata_from_market(instrument_id, market)
 
     async def fetch_account_state(self) -> AccountState:
         """
         Hesabın anlık bakiye ve marjin durumunu çeker.
         """
         balance_data = await self.okx.exchange.fetch_balance()
-        usdt_bal = balance_data.get('USDT', {})
-
-        return AccountState(
-            balance=Decimal(str(usdt_bal.get("total", 0.0))),
-            available_margin=Decimal(str(usdt_bal.get("free", 0.0))),
-            leverage=Decimal(str(config.LEVERAGE)),
+        return account_state_from_balance(
+            balance_data, Decimal(str(config.LEVERAGE))
         )
 
     async def fetch_market_data(self, instrument_id: str) -> MarketData:
@@ -64,13 +54,4 @@ class OKXPreFlightAdapter(IExchangeAdapter):
         Enstrümanın anlık tahta, gösterge (mark) ve endeks fiyatlarını çeker.
         """
         ticker = await self.okx.exchange.fetch_ticker(instrument_id)
-        last = Decimal(str(ticker.get("last") or 0))
-        bid = Decimal(str(ticker.get("bid") or last))
-        ask = Decimal(str(ticker.get("ask") or last))
-
-        return MarketData(
-            bid=bid,
-            ask=ask,
-            last=last,
-            timestamp=float(ticker.get("timestamp") or 0) / 1000,
-        )
+        return market_data_from_ticker(ticker)

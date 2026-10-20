@@ -17,6 +17,9 @@ Tarayıcıdan [http://127.0.0.1:8000](http://127.0.0.1:8000) adresini açın. Su
 - `.env` içinde `API_KEY`, `API_SECRET`, `PASSPHRASE` ve `IS_DEMO=true` ayarlanmalıdır. Demo Trading ortamında üretilmiş, okuma ve emir yetkili; para çekme yetkisi olmayan anahtar kullanın.
 - Demo paneli Demo hesabının USDT bakiyesini, ETH-USDT-SWAP pozisyonlarını ve bekleyen emirlerini ayrı gösterir. API anahtarı ve passphrase arayüze veya API yanıtlarına gönderilmez.
 - Limit ve market emirleri her gönderim öncesi onay penceresi gösterir; backend de onay bayrağını zorunlu tutar. Uygulama başına emir miktarı en fazla `1` kontrattır.
+- Demo emri göndermek için `DRY_RUN=false` olmalıdır. `DRY_RUN=true` iken panel emir göndermez; simülasyon modunda kalır.
+- Demo emri, botla aynı PreFlight kapılarından geçer: sembol kimliği, tick/lot hizası, minimum miktar, marjin, piyasa verisi tazeliği ve kill switch. Önceden reddedilen bir emir borsaya hiç gönderilmez.
+- `KILL_SWITCH_ACTIVE=true` iken panel de emir gönderemez; kill switch bu panelin etrafından dolaşılamaz.
 - Bu panel kaldıraç veya marjin ayarını değiştirmez ve ana botun strateji emir döngüsünü başlatmaz. Ana botu ayrıca çalıştırmak için bu README'deki dashboard komutunu kullanmayın; `main.py` ayrı bir programdır.
 - `IS_DEMO` kapalıysa Demo emri gönderilemez. Canlı hesap/gerçek para emri bu panelden desteklenmez.
 - Yerel arayüz Demo API anahtarlarını API yanıtlarına koymaz; emir POST isteklerinde JSON içerik türünü ve aynı-origin tarayıcı isteklerini denetler.
