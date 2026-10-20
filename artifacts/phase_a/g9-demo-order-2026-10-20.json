@@ -1,0 +1,14 @@
+{
+  "cleanup": "CANCELED",
+  "filled": 0.0,
+  "gate": "G9",
+  "mode": "DEMO",
+  "order_id": "4026561631765606401",
+  "position_size": null,
+  "preflight": "AUTHORIZED",
+  "status": "canceled",
+  "submit_status": null,
+  "symbol": "ETH/USDT:USDT",
+  "timestamp": 1792503289.5247324,
+  "verify_error": null
+}

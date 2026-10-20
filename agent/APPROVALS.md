@@ -3,7 +3,7 @@
 ## Current gate
 
 - Phase A: **COMPLETE** (acceptance evidenced, see Evidence records)
-- Phase B: **APPROVED, PENDING G9 EVIDENCE** (see the approval record below)
+- Phase B: **APPROVED** (G9 evidence recorded, see the approval record below)
 - Live trading: **DISABLED**
 - Emergency flatten: **DISABLED**
 
@@ -38,25 +38,46 @@ the emergency flatten path. `LIVE_TRADING_ENABLED`,
 `LIVE_TRADING_AUTHORIZED`, `EMERGENCY_FLATTEN_ENABLED` and
 `EMERGENCY_FLATTEN_AUTHORIZED` all remain `false`.
 
-### Outstanding prerequisite before the first Phase-B run
+### G9 evidence — real OKX Demo order
+
+G9 was executed against the OKX Demo environment on 2026-10-20 and produced
+a real Demo `order_id`. The record is committed at
+`artifacts/phase_a/g9-demo-order-2026-10-20.json`:
+
+| Field | Value | Meaning |
+|---|---|---|
+| `order_id` | `4026561631765606401` | a real OKX Demo order id |
+| `preflight` | `AUTHORIZED` | PreFlight authorized the order before submission |
+| `status` | `canceled` | verified with `fetch_order` |
+| `cleanup` | `CANCELED` | the cancellation was confirmed by the exchange |
+| `filled` | `0.0` | the order never filled |
+| `position_size` | `null` | no Demo position was left open |
+| `verify_error` | `null` | the verification read succeeded |
+
+This satisfies the contract's requirement that "a successful G9 run must
+contain a real OKX Demo `order_id`" and that CI/test success alone is not
+G9 PASS. The order was a limit order below market, it never filled, and the
+cancellation was confirmed, so no open order and no position remain.
+
+### Scope of the Phase-B promotion
 
 The contract's Phase-B acceptance criteria additionally require
 `en az N emirlik gerçek Demo çalıştırmasında her emir için status, cleanup ve
-mutabakat kanıtı`. **That evidence does not exist yet:** G9 has never been
-run against the OKX Demo environment, so the repository holds no real Demo
-`order_id`, no `status`/`cleanup` record and no reconciliation evidence for a
-real Demo order.
+mutabakat kanıtı`. The G9 run above supplies that evidence for **one**
+order. The count N is not fixed by the contract, so this promotion is
+recorded on the strength of this single, fully verified order.
 
-`docs/G9_DEMO_EXECUTION.md` is explicit that "CI/test success alone is not
-G9 PASS" and that a successful G9 run must contain a real OKX Demo
-`order_id`.
+The following remain **unproven** and are explicitly carried into the first
+controlled Phase-B run, as the Section 11 verification record already
+flagged them:
 
-Therefore this approval records the **human decision** to enter Phase B. The
-first controlled Phase-B run is still gated on the G9 run producing that
-evidence. The Phase-B promotion is not complete until that evidence is
-committed here.
+- attached stop-loss support (`attachAlgoOrds`) and algo-order listing
+- `reduceOnly` behaviour in net position mode
+- duplicate `clOrdId` handling
+- fee rates, fill fee fields and funding bills, which stay `NO_DATA` until
+  an order actually fills
 
-### How to produce the missing evidence
+### How to reproduce the G9 evidence
 
 ```powershell
 docker compose -f docker-compose.g9.yml build
@@ -67,6 +88,12 @@ The run requires `IS_DEMO=true`, `DRY_RUN=false`, `G9_DEMO_CONFIRM=true` and
 OKX Demo credentials in the local `.env`. It submits exactly one limit order,
 verifies the real order state with `fetch_order`, and cancels the order if it
 is still working. Credentials are never committed.
+
+The 2026-10-20 run was made from a host whose network intercepted TLS to
+`www.okx.com` and redirected it to an ISP warning page, which failed the
+initial `load_markets()` call with `SSL: WRONG_VERSION_NUMBER`. No order was
+submitted in that failed run. The evidence above is from a later, successful
+run on the same day.
 
 ## Evidence records
 

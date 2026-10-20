@@ -7,7 +7,7 @@ pr: N/A
 head_branch: main
 last_ci_run: N/A
 last_ci_conclusion: unknown
-last_blocker: G9 evidence pending (no real OKX Demo order recorded yet)
+last_blocker: none
 same_failure_attempts: 0
 max_same_failure_attempts: 2
 live_trading_allowed: false

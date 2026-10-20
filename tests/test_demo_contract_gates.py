@@ -275,3 +275,58 @@ def test_t16_matching_position_size_and_state_reconciles():
     assert result.code == "MATCH"
     assert result.stopped is False
 
+
+def test_t11_bot_orders_reconcile_against_exchange_orders():
+    """G11: managed orders must reconcile against the exchange order set."""
+    local = [{"id": "4026561631765606401"}]
+    exchange = [{"id": "4026561631765606401", "clientOrderId": "g9demo01"}]
+
+    result = ShadowReconciler().reconcile_orders(local, exchange)
+
+    assert result.matched is True
+    assert result.code == "MATCH"
+    assert result.stopped is False
+
+
+def test_t11_missing_exchange_order_stops_without_repair():
+    """A local order the exchange does not know about must stop the agent."""
+    local = [{"id": "4026561631765606401"}]
+    exchange = [{"id": "other", "clientOrderId": "g9demo01"}]
+
+    result = ShadowReconciler().reconcile_orders(local, exchange)
+
+    assert result.matched is False
+    assert result.code == "E_RECONCILIATION"
+    assert result.stopped is True
+
+
+def test_t11_extra_exchange_order_stops_without_repair():
+    """An exchange order the agent does not track must stop the agent."""
+    local = [{"id": "4026561631765606401"}]
+    exchange = [
+        {"id": "4026561631765606401", "clientOrderId": "g9demo01"},
+        {"id": "4026561631765606402", "clientOrderId": "g9demo02"},
+    ]
+
+    result = ShadowReconciler().reconcile_orders(local, exchange)
+
+    assert result.matched is False
+    assert result.code == "E_RECONCILIATION"
+    assert result.stopped is True
+
+
+def test_t11_foreign_orders_are_ignored_not_stopped():
+    """A manually placed order must be ignored, not treated as a mismatch."""
+    local = [{"id": "4026561631765606401"}]
+    exchange = [
+        {"id": "4026561631765606401", "clientOrderId": "g9demo01"},
+        {"id": "manual-1", "clientOrderId": "manual123"},
+    ]
+
+    result = ShadowReconciler().reconcile_orders(local, exchange)
+
+    assert result.matched is True
+    assert result.code == "UNMANAGED_ORDERS_IGNORED"
+    assert result.stopped is False
+
+
