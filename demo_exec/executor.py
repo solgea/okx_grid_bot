@@ -9,6 +9,11 @@ from .order_events import OrderEvent, OrderEventProcessor
 from .transport import NullTransport, Transport
 
 
+# Phase A is a fixed-size shadow contract only. This is not an exchange order size.
+# Phase B must source quantity from its validated order intent, never this constant.
+SHADOW_ORDER_QUANTITY = Decimal("1")
+
+
 @dataclass(frozen=True)
 class SubmitResult:
     accepted: bool
@@ -64,6 +69,15 @@ class DemoExecutor:
             result = await self.transport.place(intent)
         except (TimeoutError, ConnectionError):
             self._stopped = True
+            # Preserve a correlation target for authoritative late events. The
+            # executor remains stopped for new submissions, but a known order ID
+            # may still resolve UNKNOWN to actual exchange-reported state.
+            lifecycle = Lifecycle()
+            lifecycle.transition(LifecycleState.SUBMITTED)
+            lifecycle.transition(LifecycleState.UNKNOWN)
+            self._order_events[cl_id] = OrderEventProcessor(
+                order_quantity=SHADOW_ORDER_QUANTITY, lifecycle=lifecycle
+            )
             if self.journal:
                 try:
                     self.journal.append({"event": "UNKNOWN", "agent_id": intent.agent_id, "seq": intent.seq})
@@ -81,10 +95,10 @@ class DemoExecutor:
 
         lifecycle = Lifecycle()
         lifecycle.transition(LifecycleState.SUBMITTED)
-        # NullTransport's deterministic shadow contract uses amount=1. This is
+        # Phase A NullTransport has a fixed one-unit shadow contract. This is
         # not an exchange order quantity and cannot be reused for Phase B.
         self._order_events[cl_id] = OrderEventProcessor(
-            order_quantity=Decimal("1"), lifecycle=lifecycle
+            order_quantity=SHADOW_ORDER_QUANTITY, lifecycle=lifecycle
         )
         return SubmitResult(True, "SHADOW", LifecycleState.SUBMITTED.value, cl_id)
 
@@ -107,10 +121,10 @@ class DemoExecutor:
         """Route a validated event through the executor's tracked shadow order.
 
         This is an offline event-ingress seam only. No exchange watcher or
-        Phase-B transport is enabled by this method.
+        Phase-B transport is enabled by this method. Known order events remain
+        admissible after the executor stops new submissions, so late fill
+        evidence is not discarded.
         """
-        if self._stopped:
-            raise RuntimeError("E_AGENT_STATE: executor is stopped")
         processor = self._order_events.get(client_order_id)
         if processor is None:
             self._stop_for_unknown_order(client_order_id)

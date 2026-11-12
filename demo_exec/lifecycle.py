@@ -24,7 +24,6 @@ _ALLOWED = {
     # A fill observed while cancellation is in flight wins the race.
     LifecycleState.CANCEL_SENT: {LifecycleState.CANCEL_CONFIRMED, LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
     # Cancel acknowledgement is not proof that no fill event can arrive late.
-    # A delayed fill is authoritative execution evidence and must update state.
     LifecycleState.CANCEL_CONFIRMED: {LifecycleState.PARTIAL, LifecycleState.FILLED, LifecycleState.UNKNOWN},
 }
 
@@ -36,4 +35,22 @@ class Lifecycle:
     def transition(self, target: LifecycleState) -> None:
         if target not in _ALLOWED.get(self.state, set()):
             raise ValueError(f"invalid lifecycle transition: {self.state}->{target}")
+        self.state = target
+
+    def resolve_unknown(self, target: LifecycleState) -> None:
+        """Resolve UNKNOWN only from an authoritative, correlated order event.
+
+        This deliberately is not part of the ordinary transition graph:
+        callers must use the dedicated order-event resolution path.
+        """
+        if self.state is not LifecycleState.UNKNOWN:
+            raise ValueError("only UNKNOWN lifecycle can be externally resolved")
+        if target not in {
+            LifecycleState.ACKED,
+            LifecycleState.OPEN,
+            LifecycleState.PARTIAL,
+            LifecycleState.FILLED,
+            LifecycleState.REJECTED,
+        }:
+            raise ValueError(f"invalid UNKNOWN resolution target: {target}")
         self.state = target
